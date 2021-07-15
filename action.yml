@@ -1,0 +1,15 @@
+name: "Barecheck - Code Duplication"
+description: "GitHub Action that posts generates code duplication reports"
+branding:
+  icon: "check-circle"
+  color: "yellow"
+inputs:
+  barecheck-github-app-token:
+    description: Barecheck application token, received after application installation
+    required: true
+outputs:
+  percentage:
+    description: "Total Percentage duplication"
+runs:
+  using: "node12"
+  main: "dist/index.js"

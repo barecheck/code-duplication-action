@@ -43,14 +43,3 @@ jobs:
 
       - name: Install dependencies
         run: yarn
-
-      - name: Run test coverage
-        run: yarn coverage
-
-      # Testing beta of code coverage checks
-      # This part can be removed or optimized once barecheck code coverage will be out of beta
-      - name: Generate Code Coverage report
-        id: code-coverage
-        uses: ./
-        with:
-          barecheck-github-app-token: ${{ secrets.BARECHECK_GITHUB_APP_TOKEN }}

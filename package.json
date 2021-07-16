@@ -6,7 +6,7 @@
   "dependencies": {
     "@actions/core": "^1.4.0",
     "@actions/github": "^5.0.0",
-    "@barecheck/scanner": "^0.0.2"
+    "@barecheck/scanner": "barecheck/scanner"
   },
   "devDependencies": {
     "@vercel/ncc": "^0.28.6",

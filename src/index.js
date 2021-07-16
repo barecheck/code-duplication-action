@@ -4,7 +4,7 @@ const { duplicates } = require("@barecheck/scanner");
 async function main() {
   core.info("Hello from Github action");
 
-  const metrics = await duplicates.getMetrics("./src", "origin/master HEAD");
+  const metrics = await duplicates.getMetrics("./src", "origin/master");
 
   // eslint-disable-next-line no-console
   console.log(metrics);

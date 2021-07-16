@@ -12,14 +12,6 @@ jobs:
         with:
           node-version: 14.16.1
 
-      - name: Download code coverage report from base branch
-        uses: actions/download-artifact@v2
-        with:
-          name: ref-lcov.info
-
-      - name: Install dependencies
-        run: yarn
-
       # Testing beta of code coverage checks
       # This part can be removed or optimized once barecheck code coverage will be out of beta
       - name: Generate Code Duplications report

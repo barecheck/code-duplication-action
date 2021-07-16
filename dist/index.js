@@ -45291,8 +45291,8 @@ const buildDuplicatesTable = (clones, changedFiles) => {
   return duplicatesTable;
 };
 
-const buildTableRow = (file, clones) =>
-  `<tr><td>${file}</td><td>${clones.join("\n")}</td></tr>`;
+const buildTableRow = (file, { duplicates }) =>
+  `<tr><td>${file}</td><td>${duplicates.join("\n")}</td></tr>`;
 
 const buildDetails = (clones, changedFiles) => {
   if (clones.length === 0) return "";

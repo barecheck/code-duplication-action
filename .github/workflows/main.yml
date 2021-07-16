@@ -51,5 +51,5 @@ jobs:
         uses: ./
         with:
           barecheck-github-app-token: ${{ secrets.BARECHECK_GITHUB_APP_TOKEN }}
-          threshold: 10
+          lines-threshold: 10
           send-summary-comment: true

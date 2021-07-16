@@ -7,6 +7,14 @@ inputs:
   barecheck-github-app-token:
     description: Barecheck application token, received after application installation
     required: true
+  lines-threshold:
+    description: "Minimum code duplications lines threshold percentage that would fail a build once it reached"
+    default: "1"
+    required: false
+  send-summary-comment:
+    description: "Send Github Pull request comment with code duplications summary"
+    default: ""
+    required: false
 outputs:
   percentage:
     description: "Total Percentage duplication"

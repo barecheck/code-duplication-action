@@ -45765,7 +45765,7 @@ async function main() {
     totalTokens,
     clones,
     changedFiles
-  } = await duplicates.getMetrics("./src", "origin/master");
+  } = await duplicates.getMetrics("src", "origin/master");
 
   const body = buildBody({
     linesDiff,

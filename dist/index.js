@@ -45304,6 +45304,7 @@ const buildDetails = (clones, changedFiles) => {
   const tableHeader = "<tr><th>File</th><th>Clones</th></tr>";
 
   // eslint-disable-next-line no-console
+  console.log("changedFiles", changedFiles);
   console.log("duplicatesTable", duplicatesTable);
   console.log("clones", clones);
   const tableBody = Object.keys(duplicatesTable)

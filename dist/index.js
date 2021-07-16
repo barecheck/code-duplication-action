@@ -45215,7 +45215,7 @@ const buildDetails = __nccwpck_require__(53840);
 const buildTrendValue = (value) => {
   if (parseInt(value, 10) === 0) return value;
 
-  return `${value > 0 ? "+" : ""}${value} ${value > 0 ? "✅" : "❌"}`;
+  return `${value > 0 ? "+" : ""}${value} ${value < 0 ? "✅" : "❌"}`;
 };
 
 const buildDiff = (linesDiff, tokensDiff) => {

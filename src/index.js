@@ -1,13 +1,22 @@
 const core = require("@actions/core");
 const { duplicates } = require("@barecheck/scanner");
 
+const { commentTitle } = require("./config");
+const buildBody = require("./github/comment/buildBody");
+const createOrUpdateComment = require("./github/createOrUpdateComment");
+
 async function main() {
-  core.info("Hello from Github action");
+  const { linesDiff, tokensDiff, totalPercentage, totalTokens } =
+    await duplicates.getMetrics("./src", "origin/master");
 
-  const metrics = await duplicates.getMetrics("./src", "origin/master");
+  const body = buildBody({
+    linesDiff,
+    tokensDiff,
+    totalPercentage,
+    totalTokens
+  });
 
-  // eslint-disable-next-line no-console
-  console.log(metrics);
+  await createOrUpdateComment(commentTitle, body);
 }
 
 try {

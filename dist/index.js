@@ -35973,7 +35973,7 @@ const { duplicates } = __nccwpck_require__(1728);
 async function main() {
   core.info("Hello from Github action");
 
-  const metrics = duplicates.getMetrics("./src", "644b0a1");
+  const metrics = await duplicates.getMetrics("./src", "644b0a1");
 
   // eslint-disable-next-line no-console
   console.log(metrics);

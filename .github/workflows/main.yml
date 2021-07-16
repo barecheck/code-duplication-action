@@ -43,3 +43,13 @@ jobs:
 
       - name: Install dependencies
         run: yarn
+
+      # Testing beta of code coverage checks
+      # This part can be removed or optimized once barecheck code coverage will be out of beta
+      - name: Generate Code Duplications report
+        id: code-coverage
+        uses: ./
+        with:
+          barecheck-github-app-token: ${{ secrets.BARECHECK_GITHUB_APP_TOKEN }}
+          threshold: 10
+          send-summary-comment: true

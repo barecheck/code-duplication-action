@@ -45210,32 +45210,109 @@ module.exports = {
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 const { commentTitle } = __nccwpck_require__(34570);
+const buildDetails = __nccwpck_require__(53840);
 
 const buildTrendValue = (value) => {
   if (parseInt(value, 10) === 0) return value;
 
-  return `${value > 0 ? "+" : ""}${value}`;
+  return `${value > 0 ? "+" : ""}${value} ${value > 0 ? "✅" : "❌"}`;
 };
 
-const buildBody = ({ linesDiff, tokensDiff, totalPercentage, totalTokens }) => {
+const buildDiff = (linesDiff, tokensDiff) => {
   const trendLinesOutput = buildTrendValue(linesDiff);
   const trendBranchesOutput = buildTrendValue(tokensDiff);
 
+  if (linesDiff !== 0 || tokensDiff !== 0) {
+    const deescriptionLines = `Percentage of duplicated lines diff: ${trendLinesOutput}`;
+    const deescriptionBranches = `Percentage of duplicated branches diff: ${trendBranchesOutput}`;
+    return `\n\n\n${deescriptionLines}\n${deescriptionBranches}`;
+  }
+
+  return "";
+};
+
+const buildBody = ({
+  linesDiff,
+  tokensDiff,
+  totalPercentage,
+  totalTokens,
+  clones,
+  changedFiles
+}) => {
   const header = commentTitle;
 
   const totalPercentageOutput = `Total: <b>${totalPercentage}%</b>`;
   const totalTokensOutput = `Total Branches: <b>${totalTokens}%</b>`;
 
-  const deescriptionLines = `Percentage of duplicated lines diff: ${trendLinesOutput}`;
-  const deescriptionBranches = `Percentage of duplicated branches diff: ${trendBranchesOutput}`;
-  const description = `${totalPercentageOutput}\n\n${totalTokensOutput}\n\n\n${deescriptionLines}\n${deescriptionBranches}`;
+  const duplicationsDiff = buildDiff(linesDiff, tokensDiff);
+  const description = `${totalPercentageOutput}\n\n${totalTokensOutput}${duplicationsDiff}`;
+  const details = buildDetails(clones, changedFiles);
 
-  const body = `<h3>${header}</h3>${description}`;
+  const body = `<h3>${header}</h3>${description}${details}`;
 
   return body;
 };
 
 module.exports = buildBody;
+
+
+/***/ }),
+
+/***/ 53840:
+/***/ ((module) => {
+
+const buildDuplicatesTable = (clones, changedFiles) => {
+  const duplicatesTable = clones.reduce(
+    (acc, { duplicationA, duplicationB }) => {
+      const buildLine = (duplication) => {
+        const path = duplication.sourceId;
+        const startLine = duplication.start.line;
+        const endLine = duplication.end.line;
+
+        return `${path}:${startLine}-${endLine}`;
+      };
+
+      // show report only with changed files
+      if (changedFiles.includes(duplicationB.sourceId)) {
+        const index = buildLine(duplicationB);
+        const defaultDuplicatedBlock = {
+          duplicates: []
+        };
+        const duplicatedBlock = acc[index] || defaultDuplicatedBlock;
+        duplicatedBlock.duplicates.push(buildLine(duplicationA));
+        acc[index] = duplicatedBlock;
+      }
+
+      return acc;
+    },
+    {}
+  );
+
+  return duplicatesTable;
+};
+
+const buildTableRow = (file, clones) =>
+  `<tr><td>${file}</td><td>${clones.join("\n")}</td></tr>`;
+
+const buildDetails = (clones, changedFiles) => {
+  if (clones.length === 0) return "";
+
+  const duplicatesTable = buildDuplicatesTable(clones, changedFiles);
+
+  const summary = "<summary>New code duplications found</summary>";
+
+  const tableHeader = "<tr><th>File</th><th>Clones</th></tr>";
+
+  const tableBody = Object.keys(duplicatesTable)
+    .map((key) => buildTableRow(key, duplicatesTable[key]))
+    .join("");
+
+  const table = `<table><tbody>${tableHeader}${tableBody}</tbody></table>`;
+
+  return `<details>${summary}${table}</details>`;
+};
+
+module.exports = buildDetails;
 
 
 /***/ }),
@@ -45677,14 +45754,22 @@ const buildBody = __nccwpck_require__(10681);
 const createOrUpdateComment = __nccwpck_require__(88646);
 
 async function main() {
-  const { linesDiff, tokensDiff, totalPercentage, totalTokens } =
-    await duplicates.getMetrics("./src", "origin/master");
+  const {
+    linesDiff,
+    tokensDiff,
+    totalPercentage,
+    totalTokens,
+    clones,
+    changedFiles
+  } = await duplicates.getMetrics("./src", "origin/master");
 
   const body = buildBody({
     linesDiff,
     tokensDiff,
     totalPercentage,
-    totalTokens
+    totalTokens,
+    clones,
+    changedFiles
   });
 
   await createOrUpdateComment(commentTitle, body);

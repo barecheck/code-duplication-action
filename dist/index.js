@@ -45228,7 +45228,7 @@ const buildBody = ({ linesDiff, tokensDiff, totalPercentage, totalTokens }) => {
 
   const deescriptionLines = `Percentage of duplicated lines diff: ${trendLinesOutput}`;
   const deescriptionBranches = `Percentage of duplicated branches diff: ${trendBranchesOutput}`;
-  const description = `${totalPercentageOutput}\n${totalTokensOutput}\n\n${deescriptionLines}\n${deescriptionBranches}`;
+  const description = `${totalPercentageOutput}\n\n${totalTokensOutput}\n\n\n${deescriptionLines}\n${deescriptionBranches}`;
 
   const body = `<h3>${header}</h3>${description}`;
 

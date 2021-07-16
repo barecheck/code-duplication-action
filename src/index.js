@@ -6,14 +6,22 @@ const buildBody = require("./github/comment/buildBody");
 const createOrUpdateComment = require("./github/createOrUpdateComment");
 
 async function main() {
-  const { linesDiff, tokensDiff, totalPercentage, totalTokens } =
-    await duplicates.getMetrics("./src", "origin/master");
+  const {
+    linesDiff,
+    tokensDiff,
+    totalPercentage,
+    totalTokens,
+    clones,
+    changedFiles
+  } = await duplicates.getMetrics("./src", "origin/master");
 
   const body = buildBody({
     linesDiff,
     tokensDiff,
     totalPercentage,
-    totalTokens
+    totalTokens,
+    clones,
+    changedFiles
   });
 
   await createOrUpdateComment(commentTitle, body);

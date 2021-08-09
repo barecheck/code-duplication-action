@@ -232,8 +232,8 @@
 
 "@barecheck/scanner@barecheck/scanner":
   version "0.0.2"
-  uid abd63749af8211e277b779ec5386092ef74114c9
-  resolved "https://codeload.github.com/barecheck/scanner/tar.gz/abd63749af8211e277b779ec5386092ef74114c9"
+  uid f6da93c72a1c35bfa36cb112f1e7e6b0a1010422
+  resolved "https://codeload.github.com/barecheck/scanner/tar.gz/f6da93c72a1c35bfa36cb112f1e7e6b0a1010422"
   dependencies:
     "@jscpd/core" "^3.3.17"
     "@jscpd/finder" "^3.3.26"

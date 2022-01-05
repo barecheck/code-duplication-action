@@ -45899,13 +45899,15 @@ module.exports = findComment;
 
 const github = __nccwpck_require__(95438);
 
-const { createGithubAccessToken } = __nccwpck_require__(44030);
+const {
+  endpoints: { createGithubAccessToken }
+} = __nccwpck_require__(47127);
 const { getBarecheckGithubAppToken } = __nccwpck_require__(70006);
 
 let githubAccessToken = null;
 
 const createNewAccessToken = async (githubAppToken) => {
-  const { token } = await createGithubAccessToken(githubAppToken);
+  const { token } = await createGithubAccessToken({ githubAppToken });
 
   return token;
 };
@@ -45968,62 +45970,6 @@ const getBarecheckGithubAppToken = () =>
 
 module.exports = {
   getBarecheckGithubAppToken
-};
-
-
-/***/ }),
-
-/***/ 44030:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const axios = __nccwpck_require__(96545);
-
-const { barecheckApiUrl } = __nccwpck_require__(34570);
-
-const makeRequest = async (query, variables) => {
-  const { data } = await axios.post(
-    barecheckApiUrl,
-    {
-      query,
-      variables
-    },
-    {
-      headers: {
-        "Content-Type": "application/json"
-      }
-    }
-  );
-
-  return data;
-};
-
-const createGithubAccessToken = async (githubAppToken) => {
-  const query = `mutation createGithubAccessToken($githubAppToken: String!) {
-    createGithubAccessToken(githubAppToken:$githubAppToken) {
-      success
-      code
-      token
-    }
-  }`;
-
-  const variables = {
-    githubAppToken
-  };
-
-  const { data } = await makeRequest(query, variables);
-
-  if (!data.createGithubAccessToken.success) {
-    console.log(data);
-    throw new Error(
-      "Couldn't fetch access token for Github application. Check if you use the correct `BARECHECK_GITHUB_APP_TOKEN`"
-    );
-  }
-
-  return data.createGithubAccessToken;
-};
-
-module.exports = {
-  createGithubAccessToken
 };
 
 

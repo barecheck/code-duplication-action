@@ -1,12 +1,14 @@
 const github = require("@actions/github");
 
-const { createGithubAccessToken } = require("../services/barecheckApi");
+const {
+  endpoints: { createGithubAccessToken }
+} = require("barecheck");
 const { getBarecheckGithubAppToken } = require("../input");
 
 let githubAccessToken = null;
 
 const createNewAccessToken = async (githubAppToken) => {
-  const { token } = await createGithubAccessToken(githubAppToken);
+  const { token } = await createGithubAccessToken({ githubAppToken });
 
   return token;
 };

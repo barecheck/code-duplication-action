@@ -46194,7 +46194,7 @@ const buildBody = __nccwpck_require__(10681);
 const createOrUpdateComment = __nccwpck_require__(88646);
 
 async function main() {
-  const { statistic, clones } = await detectClones("./src", {});
+  const { statistic, clones } = await detectClones(["./src"], {});
 
   const body = buildBody(statistic, clones);
 

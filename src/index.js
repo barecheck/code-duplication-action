@@ -6,7 +6,7 @@ const buildBody = require("./github/comment/buildBody");
 const createOrUpdateComment = require("./github/createOrUpdateComment");
 
 async function main() {
-  const { statistic, clones } = await detectClones("./src", {});
+  const { statistic, clones } = await detectClones(["./src"], {});
 
   const body = buildBody(statistic, clones);
 

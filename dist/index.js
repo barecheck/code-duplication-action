@@ -45799,10 +45799,10 @@ const { commentTitle } = __nccwpck_require__(34570);
 const buildBody = (statistic, clones) => {
   const header = commentTitle;
 
-  const totalPercentageOutput = `Total Lines: <b>${statistic.total.lines}%</b>`;
-  const totalTokensOutput = `Duplications: <b>${statistic.total.duplicatedLines}%</b>`;
+  const totalPercentageOutput = `Total Lines: <b>${statistic.total.lines}</b>`;
+  const totalDuplicationsOutput = `Duplications: <b>${statistic.total.duplicatedLines}</b>`;
 
-  const description = `${totalPercentageOutput}\n\n${totalTokensOutput}`;
+  const description = `${totalPercentageOutput}\n\n${totalDuplicationsOutput}`;
 
   const body = `<h3>${header}</h3>${description}`;
 
@@ -45917,9 +45917,6 @@ const getOctokitClient = async () => {
 
   if (githubAccessToken === null)
     githubAccessToken = await createNewAccessToken(githubAppToken);
-
-  // eslint-disable-next-line no-console
-  console.log(githubAccessToken);
 
   const octokit = github.getOctokit(githubAccessToken);
 

@@ -19,9 +19,6 @@ const getOctokitClient = async () => {
   if (githubAccessToken === null)
     githubAccessToken = await createNewAccessToken(githubAppToken);
 
-  // eslint-disable-next-line no-console
-  console.log(githubAccessToken);
-
   const octokit = github.getOctokit(githubAccessToken);
 
   return octokit;

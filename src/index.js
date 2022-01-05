@@ -1,16 +1,21 @@
 const core = require("@actions/core");
 const { detectClones } = require("barecheck");
 
-const { commentTitle } = require("./config");
-const buildBody = require("./github/comment/buildBody");
-const createOrUpdateComment = require("./github/createOrUpdateComment");
+// const { commentTitle } = require("./config");
+// const buildBody = require("./github/comment/buildBody");
+// const createOrUpdateComment = require("./github/createOrUpdateComment");
 
 async function main() {
-  const { statistic, clones } = await detectClones(["./src"], {});
+  try {
+    const { statistic, clones } = await detectClones(["./src"], {});
+    // eslint-disable-next-line no-console
+    console.log(statistic, clones);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.log(err);
+  }
 
-  const body = buildBody(statistic, clones);
-
-  await createOrUpdateComment(commentTitle, body);
+  // await createOrUpdateComment(commentTitle, body);
 }
 
 try {

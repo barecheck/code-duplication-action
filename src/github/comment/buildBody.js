@@ -1,43 +1,15 @@
 const { commentTitle } = require("../../config");
-const buildDetails = require("./buildDetails");
 
-const buildTrendValue = (value) => {
-  if (parseInt(value, 10) === 0) return value;
-
-  return `${value > 0 ? "+" : ""}${value} ${value < 0 ? "✅" : "❌"}`;
-};
-
-const buildDiff = (linesDiff, tokensDiff) => {
-  const trendLinesOutput = buildTrendValue(linesDiff);
-  const trendBranchesOutput = buildTrendValue(tokensDiff);
-
-  if (linesDiff !== 0 || tokensDiff !== 0) {
-    const deescriptionLines = `Percentage of duplicated lines diff: ${trendLinesOutput}`;
-    const deescriptionBranches = `Percentage of duplicated branches diff: ${trendBranchesOutput}`;
-    return `\n\n\n${deescriptionLines}\n${deescriptionBranches}`;
-  }
-
-  return "";
-};
-
-const buildBody = ({
-  linesDiff,
-  tokensDiff,
-  totalPercentage,
-  totalTokens,
-  clones,
-  changedFiles
-}) => {
+// eslint-disable-next-line no-unused-vars
+const buildBody = (statistic, clones) => {
   const header = commentTitle;
 
-  const totalPercentageOutput = `Total: <b>${totalPercentage}%</b>`;
-  const totalTokensOutput = `Total Branches: <b>${totalTokens}%</b>`;
+  const totalPercentageOutput = `Total Lines: <b>${statistic.total.lines}%</b>`;
+  const totalTokensOutput = `Duplications: <b>${statistic.total.duplicatedLines}%</b>`;
 
-  const duplicationsDiff = buildDiff(linesDiff, tokensDiff);
-  const description = `${totalPercentageOutput}\n\n${totalTokensOutput}${duplicationsDiff}`;
-  const details = buildDetails(clones, changedFiles);
+  const description = `${totalPercentageOutput}\n\n${totalTokensOutput}`;
 
-  const body = `<h3>${header}</h3>${description}${details}`;
+  const body = `<h3>${header}</h3>${description}`;
 
   return body;
 };

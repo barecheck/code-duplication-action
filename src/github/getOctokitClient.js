@@ -1,7 +1,11 @@
 const github = require("@actions/github");
 
+const {
+  api: {
+    endpoints: { createGithubAccessToken }
+  }
+} = require("barecheck");
 const { getBarecheckGithubAppToken } = require("../input");
-const { createGithubAccessToken } = require("../services/barecheckApi");
 
 let githubAccessToken = null;
 

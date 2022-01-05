@@ -45900,7 +45900,9 @@ module.exports = findComment;
 const github = __nccwpck_require__(95438);
 
 const {
-  endpoints: { createGithubAccessToken }
+  api: {
+    endpoints: { createGithubAccessToken }
+  }
 } = __nccwpck_require__(47127);
 const { getBarecheckGithubAppToken } = __nccwpck_require__(70006);
 

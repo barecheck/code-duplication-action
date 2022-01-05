@@ -21,9 +21,7 @@ const getOctokitClient = async () => {
     throw new Error("barecheck-github-app-token property is required");
 
   if (githubAccessToken === null)
-    githubAccessToken = await createNewAccessToken({
-      githubAppToken
-    });
+    githubAccessToken = await createNewAccessToken(githubAppToken);
 
   // eslint-disable-next-line no-console
   console.log(githubAccessToken);

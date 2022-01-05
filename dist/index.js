@@ -45920,9 +45920,7 @@ const getOctokitClient = async () => {
     throw new Error("barecheck-github-app-token property is required");
 
   if (githubAccessToken === null)
-    githubAccessToken = await createNewAccessToken({
-      githubAppToken
-    });
+    githubAccessToken = await createNewAccessToken(githubAppToken);
 
   // eslint-disable-next-line no-console
   console.log(githubAccessToken);
@@ -46199,19 +46197,19 @@ const buildBody = __nccwpck_require__(10681);
 const createOrUpdateComment = __nccwpck_require__(88646);
 
 async function main() {
-  const { statistic, clones } = await detectClones(["./src"], {});
+  try {
+    const { statistic, clones } = await detectClones(["./src"], {});
 
-  const body = buildBody(statistic, clones);
+    const body = buildBody(statistic, clones);
 
-  await createOrUpdateComment(commentTitle, body);
+    await createOrUpdateComment(commentTitle, body);
+  } catch (err) {
+    core.info(err);
+    core.setFailed(err.message);
+  }
 }
 
-try {
-  main();
-} catch (err) {
-  core.info(err);
-  core.setFailed(err.message);
-}
+main();
 
 })();
 

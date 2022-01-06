@@ -1,23 +1,27 @@
 const github = require("@actions/github");
 
+const {
+  api: {
+    endpoints: { createGithubAccessToken }
+  }
+} = require("barecheck");
 const { getBarecheckGithubAppToken } = require("../input");
-const { createGithubAccessToken } = require("../services/barecheckApi");
 
 let githubAccessToken = null;
 
-const createNewAccessToken = async (barecheckGithubAppToken) => {
-  const { token } = await createGithubAccessToken(barecheckGithubAppToken);
+const createNewAccessToken = async (githubAppToken) => {
+  const { token } = await createGithubAccessToken({ githubAppToken });
 
   return token;
 };
 
 const getOctokitClient = async () => {
-  const barecheckGithubAppToken = getBarecheckGithubAppToken();
-  if (!barecheckGithubAppToken)
+  const githubAppToken = getBarecheckGithubAppToken();
+  if (!githubAppToken)
     throw new Error("barecheck-github-app-token property is required");
 
-  if (!githubAccessToken)
-    githubAccessToken = await createNewAccessToken(barecheckGithubAppToken);
+  if (githubAccessToken === null)
+    githubAccessToken = await createNewAccessToken(githubAppToken);
 
   const octokit = github.getOctokit(githubAccessToken);
 

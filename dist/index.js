@@ -27,7 +27,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.issue = exports.issueCommand = void 0;
-const os = __importStar(__nccwpck_require__(12087));
+const os = __importStar(__nccwpck_require__(22037));
 const utils_1 = __nccwpck_require__(5278);
 /**
  * Commands
@@ -134,12 +134,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.getState = exports.saveState = exports.group = exports.endGroup = exports.startGroup = exports.info = exports.warning = exports.error = exports.debug = exports.isDebug = exports.setFailed = exports.setCommandEcho = exports.setOutput = exports.getBooleanInput = exports.getMultilineInput = exports.getInput = exports.addPath = exports.setSecret = exports.exportVariable = exports.ExitCode = void 0;
+exports.getIDToken = exports.getState = exports.saveState = exports.group = exports.endGroup = exports.startGroup = exports.info = exports.notice = exports.warning = exports.error = exports.debug = exports.isDebug = exports.setFailed = exports.setCommandEcho = exports.setOutput = exports.getBooleanInput = exports.getMultilineInput = exports.getInput = exports.addPath = exports.setSecret = exports.exportVariable = exports.ExitCode = void 0;
 const command_1 = __nccwpck_require__(87351);
 const file_command_1 = __nccwpck_require__(717);
 const utils_1 = __nccwpck_require__(5278);
-const os = __importStar(__nccwpck_require__(12087));
-const path = __importStar(__nccwpck_require__(85622));
+const os = __importStar(__nccwpck_require__(22037));
+const path = __importStar(__nccwpck_require__(71017));
+const oidc_utils_1 = __nccwpck_require__(98041);
 /**
  * The code to exit an action
  */
@@ -312,19 +313,30 @@ exports.debug = debug;
 /**
  * Adds an error issue
  * @param message error issue message. Errors will be converted to string via toString()
+ * @param properties optional properties to add to the annotation.
  */
-function error(message) {
-    command_1.issue('error', message instanceof Error ? message.toString() : message);
+function error(message, properties = {}) {
+    command_1.issueCommand('error', utils_1.toCommandProperties(properties), message instanceof Error ? message.toString() : message);
 }
 exports.error = error;
 /**
- * Adds an warning issue
+ * Adds a warning issue
  * @param message warning issue message. Errors will be converted to string via toString()
+ * @param properties optional properties to add to the annotation.
  */
-function warning(message) {
-    command_1.issue('warning', message instanceof Error ? message.toString() : message);
+function warning(message, properties = {}) {
+    command_1.issueCommand('warning', utils_1.toCommandProperties(properties), message instanceof Error ? message.toString() : message);
 }
 exports.warning = warning;
+/**
+ * Adds a notice issue
+ * @param message notice issue message. Errors will be converted to string via toString()
+ * @param properties optional properties to add to the annotation.
+ */
+function notice(message, properties = {}) {
+    command_1.issueCommand('notice', utils_1.toCommandProperties(properties), message instanceof Error ? message.toString() : message);
+}
+exports.notice = notice;
 /**
  * Writes info to log with console.log.
  * @param message info message
@@ -397,6 +409,12 @@ function getState(name) {
     return process.env[`STATE_${name}`] || '';
 }
 exports.getState = getState;
+function getIDToken(aud) {
+    return __awaiter(this, void 0, void 0, function* () {
+        return yield oidc_utils_1.OidcClient.getIDToken(aud);
+    });
+}
+exports.getIDToken = getIDToken;
 //# sourceMappingURL=core.js.map
 
 /***/ }),
@@ -430,8 +448,8 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.issueCommand = void 0;
 // We use any as a valid input type
 /* eslint-disable @typescript-eslint/no-explicit-any */
-const fs = __importStar(__nccwpck_require__(35747));
-const os = __importStar(__nccwpck_require__(12087));
+const fs = __importStar(__nccwpck_require__(57147));
+const os = __importStar(__nccwpck_require__(22037));
 const utils_1 = __nccwpck_require__(5278);
 function issueCommand(command, message) {
     const filePath = process.env[`GITHUB_${command}`];
@@ -450,6 +468,90 @@ exports.issueCommand = issueCommand;
 
 /***/ }),
 
+/***/ 98041:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.OidcClient = void 0;
+const http_client_1 = __nccwpck_require__(39925);
+const auth_1 = __nccwpck_require__(23702);
+const core_1 = __nccwpck_require__(42186);
+class OidcClient {
+    static createHttpClient(allowRetry = true, maxRetry = 10) {
+        const requestOptions = {
+            allowRetries: allowRetry,
+            maxRetries: maxRetry
+        };
+        return new http_client_1.HttpClient('actions/oidc-client', [new auth_1.BearerCredentialHandler(OidcClient.getRequestToken())], requestOptions);
+    }
+    static getRequestToken() {
+        const token = process.env['ACTIONS_ID_TOKEN_REQUEST_TOKEN'];
+        if (!token) {
+            throw new Error('Unable to get ACTIONS_ID_TOKEN_REQUEST_TOKEN env variable');
+        }
+        return token;
+    }
+    static getIDTokenUrl() {
+        const runtimeUrl = process.env['ACTIONS_ID_TOKEN_REQUEST_URL'];
+        if (!runtimeUrl) {
+            throw new Error('Unable to get ACTIONS_ID_TOKEN_REQUEST_URL env variable');
+        }
+        return runtimeUrl;
+    }
+    static getCall(id_token_url) {
+        var _a;
+        return __awaiter(this, void 0, void 0, function* () {
+            const httpclient = OidcClient.createHttpClient();
+            const res = yield httpclient
+                .getJson(id_token_url)
+                .catch(error => {
+                throw new Error(`Failed to get ID Token. \n 
+        Error Code : ${error.statusCode}\n 
+        Error Message: ${error.result.message}`);
+            });
+            const id_token = (_a = res.result) === null || _a === void 0 ? void 0 : _a.value;
+            if (!id_token) {
+                throw new Error('Response json body do not have ID Token field');
+            }
+            return id_token;
+        });
+    }
+    static getIDToken(audience) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                // New ID Token is requested from action service
+                let id_token_url = OidcClient.getIDTokenUrl();
+                if (audience) {
+                    const encodedAudience = encodeURIComponent(audience);
+                    id_token_url = `${id_token_url}&audience=${encodedAudience}`;
+                }
+                core_1.debug(`ID token url is ${id_token_url}`);
+                const id_token = yield OidcClient.getCall(id_token_url);
+                core_1.setSecret(id_token);
+                return id_token;
+            }
+            catch (error) {
+                throw new Error(`Error message: ${error.message}`);
+            }
+        });
+    }
+}
+exports.OidcClient = OidcClient;
+//# sourceMappingURL=oidc-utils.js.map
+
+/***/ }),
+
 /***/ 5278:
 /***/ ((__unused_webpack_module, exports) => {
 
@@ -458,7 +560,7 @@ exports.issueCommand = issueCommand;
 // We use any as a valid input type
 /* eslint-disable @typescript-eslint/no-explicit-any */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.toCommandValue = void 0;
+exports.toCommandProperties = exports.toCommandValue = void 0;
 /**
  * Sanitizes an input into a string so it can be passed into issueCommand safely
  * @param input input to sanitize into a string
@@ -473,6 +575,26 @@ function toCommandValue(input) {
     return JSON.stringify(input);
 }
 exports.toCommandValue = toCommandValue;
+/**
+ *
+ * @param annotationProperties
+ * @returns The command properties to send with the actual annotation command
+ * See IssueCommandProperties: https://github.com/actions/runner/blob/main/src/Runner.Worker/ActionCommandManager.cs#L646
+ */
+function toCommandProperties(annotationProperties) {
+    if (!Object.keys(annotationProperties).length) {
+        return {};
+    }
+    return {
+        title: annotationProperties.title,
+        file: annotationProperties.file,
+        line: annotationProperties.startLine,
+        endLine: annotationProperties.endLine,
+        col: annotationProperties.startColumn,
+        endColumn: annotationProperties.endColumn
+    };
+}
+exports.toCommandProperties = toCommandProperties;
 //# sourceMappingURL=utils.js.map
 
 /***/ }),
@@ -484,8 +606,8 @@ exports.toCommandValue = toCommandValue;
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Context = void 0;
-const fs_1 = __nccwpck_require__(35747);
-const os_1 = __nccwpck_require__(12087);
+const fs_1 = __nccwpck_require__(57147);
+const os_1 = __nccwpck_require__(22037);
 class Context {
     /**
      * Hydrate the context from the environment
@@ -692,14 +814,80 @@ exports.getOctokitOptions = getOctokitOptions;
 
 /***/ }),
 
+/***/ 23702:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+class BasicCredentialHandler {
+    constructor(username, password) {
+        this.username = username;
+        this.password = password;
+    }
+    prepareRequest(options) {
+        options.headers['Authorization'] =
+            'Basic ' +
+                Buffer.from(this.username + ':' + this.password).toString('base64');
+    }
+    // This handler cannot handle 401
+    canHandleAuthentication(response) {
+        return false;
+    }
+    handleAuthentication(httpClient, requestInfo, objs) {
+        return null;
+    }
+}
+exports.BasicCredentialHandler = BasicCredentialHandler;
+class BearerCredentialHandler {
+    constructor(token) {
+        this.token = token;
+    }
+    // currently implements pre-authorization
+    // TODO: support preAuth = false where it hooks on 401
+    prepareRequest(options) {
+        options.headers['Authorization'] = 'Bearer ' + this.token;
+    }
+    // This handler cannot handle 401
+    canHandleAuthentication(response) {
+        return false;
+    }
+    handleAuthentication(httpClient, requestInfo, objs) {
+        return null;
+    }
+}
+exports.BearerCredentialHandler = BearerCredentialHandler;
+class PersonalAccessTokenCredentialHandler {
+    constructor(token) {
+        this.token = token;
+    }
+    // currently implements pre-authorization
+    // TODO: support preAuth = false where it hooks on 401
+    prepareRequest(options) {
+        options.headers['Authorization'] =
+            'Basic ' + Buffer.from('PAT:' + this.token).toString('base64');
+    }
+    // This handler cannot handle 401
+    canHandleAuthentication(response) {
+        return false;
+    }
+    handleAuthentication(httpClient, requestInfo, objs) {
+        return null;
+    }
+}
+exports.PersonalAccessTokenCredentialHandler = PersonalAccessTokenCredentialHandler;
+
+
+/***/ }),
+
 /***/ 39925:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-const http = __nccwpck_require__(15876);
-const https = __nccwpck_require__(57211);
+const http = __nccwpck_require__(13685);
+const https = __nccwpck_require__(95687);
 const pm = __nccwpck_require__(16443);
 let tunnel;
 var HttpCodes;
@@ -1302,2561 +1490,6 @@ exports.checkBypass = checkBypass;
 
 /***/ }),
 
-/***/ 1728:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const getMetrics = __nccwpck_require__(53752);
-
-const duplicates = {
-  getMetrics
-};
-
-const barecheck = {
-  duplicates
-};
-
-module.exports = barecheck;
-
-
-/***/ }),
-
-/***/ 23994:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const { promisify } = __nccwpck_require__(31669);
-const exec = promisify(__nccwpck_require__(63129).exec);
-
-// TODO: have better approach of seitching between branches
-// Would be great to have covered cases where we have errors during checkout and we can easily rollback
-
-const checkoutToBranch = async (branch) => exec(`git checkout ${branch}`);
-
-const getCurrentBranch = async () => {
-  const { stdout: branch } = await exec('git rev-parse --abbrev-ref HEAD');
-
-  return branch.trim();
-};
-
-const stash = () => exec(`git stash`);
-
-const stashApply = () => exec(`git stash apply`);
-
-const diffFileNames = async (branch) => {
-  const { stdout: files } = await exec(`git diff --name-only ${branch}`);
-
-  return files.split('\n').filter((path) => path !== '');
-};
-
-module.exports = {
-  checkoutToBranch,
-  getCurrentBranch,
-  stash,
-  stashApply,
-  diffFileNames
-};
-
-
-/***/ }),
-
-/***/ 41067:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const { MemoryStore, Statistic, getDefaultOptions } = __nccwpck_require__(84511);
-const { Tokenizer, getSupportedFormats } = __nccwpck_require__(92080);
-const { getFilesToDetect, InFilesDetector } = __nccwpck_require__(39148);
-
-const detectClones = async (path) => {
-  // TODO: Ability to confifure code duplication by passing jscpd config
-  const options = {
-    ...getDefaultOptions(),
-    ...{
-      minLines: 5,
-      maxLines: 500,
-      format: getSupportedFormats(),
-      path
-    }
-  };
-
-  const tokenizer = new Tokenizer();
-  // here you can use any store what implement IStore interface
-  const store = new MemoryStore();
-  const statistic = new Statistic(options);
-
-  const files = getFilesToDetect(options);
-
-  const detector = new InFilesDetector(tokenizer, store, statistic, options);
-
-  const clones = await detector.detect(files);
-
-  return { statistic: statistic.statistic, clones };
-};
-
-module.exports = {
-  detectClones
-};
-
-
-/***/ }),
-
-/***/ 53752:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const { detectClones } = __nccwpck_require__(41067);
-const {
-  getCurrentBranch,
-  checkoutToBranch,
-  stash,
-  stashApply,
-  diffFileNames
-} = __nccwpck_require__(23994);
-
-const getStatisticFromBaseBranch = async (path, currentBranch, baseBranch) => {
-  await stash();
-
-  await checkoutToBranch(baseBranch);
-  const duplicates = await detectClones(path);
-  await checkoutToBranch(currentBranch);
-
-  try {
-    await stashApply();
-  } catch (err) {
-    // TODO: find better way of checking if apply exists
-    // eslint-disable-next-line no-console
-    console.error(err);
-  }
-
-  return duplicates;
-};
-
-const decimal = (num, count) => (Math.round(num * 100) / 100).toFixed(count);
-
-const getMetrics = async (path, baseBranch) => {
-  const currentBranch = await getCurrentBranch();
-  const duplicates = await detectClones([path]);
-  const changedFiles = await diffFileNames(baseBranch);
-
-  const baseBranchDuplicates = await getStatisticFromBaseBranch(
-    [path],
-    currentBranch,
-    baseBranch
-  );
-
-  const { percentage: linesPercentage, percentageTokens } =
-    duplicates.statistic.total;
-  const {
-    percentage: baseBranchLinesPercentage,
-    percentageTokens: baseBranchPercentageTokens
-  } = baseBranchDuplicates.statistic.total;
-
-  const linesDiff = decimal(linesPercentage - baseBranchLinesPercentage, 2);
-  const tokensDiff = decimal(percentageTokens - baseBranchPercentageTokens, 2);
-
-  return {
-    linesDiff,
-    tokensDiff,
-    totalPercentage: linesPercentage,
-    totalTokens: percentageTokens,
-    clones: duplicates.clones,
-    changedFiles
-  };
-};
-
-module.exports = getMetrics;
-
-
-/***/ }),
-
-/***/ 55128:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const rabin_karp_1 = __nccwpck_require__(8105);
-const validators_1 = __nccwpck_require__(82218);
-const mode_1 = __nccwpck_require__(27899);
-// TODO replace to own event emitter
-const EventEmitter = __nccwpck_require__(11848);
-class Detector extends EventEmitter {
-    constructor(tokenizer, store, cloneValidators = [], options) {
-        super();
-        this.tokenizer = tokenizer;
-        this.store = store;
-        this.cloneValidators = cloneValidators;
-        this.options = options;
-        this.initCloneValidators();
-        this.algorithm = new rabin_karp_1.RabinKarp(this.options, this, this.cloneValidators);
-        this.options.minTokens = this.options.minTokens || 50;
-        this.options.maxLines = this.options.maxLines || 500;
-        this.options.minLines = this.options.minLines || 5;
-        this.options.mode = this.options.mode || mode_1.mild;
-    }
-    detect(id, text, format) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const tokenMaps = this.tokenizer.generateMaps(id, text, format, this.options);
-            // TODO change stores implementation
-            this.store.namespace(format);
-            const detect = (tokenMap, clones) => __awaiter(this, void 0, void 0, function* () {
-                if (tokenMap) {
-                    this.emit('START_DETECTION', { source: tokenMap });
-                    return this.algorithm
-                        .run(tokenMap, this.store)
-                        .then((clns) => {
-                        clones.push(...clns);
-                        const nextTokenMap = tokenMaps.pop();
-                        if (nextTokenMap) {
-                            return detect(nextTokenMap, clones);
-                        }
-                        else {
-                            return clones;
-                        }
-                    });
-                }
-            });
-            return detect(tokenMaps.pop(), []);
-        });
-    }
-    initCloneValidators() {
-        if (this.options.minLines || this.options.maxLines) {
-            this.cloneValidators.push(new validators_1.LinesLengthCloneValidator());
-        }
-    }
-}
-exports.Detector = Detector;
-//# sourceMappingURL=detector.js.map
-
-/***/ }),
-
-/***/ 84511:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-function __export(m) {
-    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
-}
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-__export(__nccwpck_require__(55128));
-__export(__nccwpck_require__(27899));
-__export(__nccwpck_require__(81070));
-__export(__nccwpck_require__(67799));
-__export(__nccwpck_require__(54628));
-//# sourceMappingURL=index.js.map
-
-/***/ }),
-
-/***/ 27899:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-function strict(token) {
-    return token.type !== 'ignore';
-}
-exports.strict = strict;
-function mild(token) {
-    return strict(token) && token.type !== 'empty' && token.type !== 'new_line';
-}
-exports.mild = mild;
-function weak(token) {
-    return mild(token)
-        && token.format !== 'comment'
-        && token.type !== 'comment'
-        && token.type !== 'block-comment';
-}
-exports.weak = weak;
-const MODES = {
-    mild,
-    strict,
-    weak,
-};
-function getModeByName(name) {
-    if (name in MODES) {
-        return MODES[name];
-    }
-    throw new Error(`Mode ${name} does not supported yet.`);
-}
-exports.getModeByName = getModeByName;
-function getModeHandler(mode) {
-    return typeof mode === 'string' ? getModeByName(mode) : mode;
-}
-exports.getModeHandler = getModeHandler;
-//# sourceMappingURL=mode.js.map
-
-/***/ }),
-
-/***/ 81070:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const mode_1 = __nccwpck_require__(27899);
-function getDefaultOptions() {
-    return {
-        executionId: new Date().toISOString(),
-        path: [process.cwd()],
-        mode: mode_1.getModeHandler('mild'),
-        minLines: 5,
-        maxLines: 1000,
-        maxSize: '100kb',
-        minTokens: 50,
-        output: './report',
-        reporters: ['console'],
-        ignore: [],
-        threshold: undefined,
-        formatsExts: {},
-        debug: false,
-        silent: false,
-        blame: false,
-        cache: true,
-        absolute: false,
-        noSymlinks: false,
-        skipLocal: false,
-        ignoreCase: false,
-        gitignore: false,
-        reportersOptions: {},
-    };
-}
-exports.getDefaultOptions = getDefaultOptions;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getOption(name, options) {
-    const defaultOptions = getDefaultOptions();
-    return options ? options[name] || defaultOptions[name] : defaultOptions[name];
-}
-exports.getOption = getOption;
-//# sourceMappingURL=options.js.map
-
-/***/ }),
-
-/***/ 8105:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const validators_1 = __nccwpck_require__(82218);
-class RabinKarp {
-    constructor(options, eventEmitter, cloneValidators) {
-        this.options = options;
-        this.eventEmitter = eventEmitter;
-        this.cloneValidators = cloneValidators;
-    }
-    run(tokenMap, store) {
-        return __awaiter(this, void 0, void 0, function* () {
-            return new Promise((resolve => {
-                let mapFrameInStore;
-                let clone = null;
-                const clones = [];
-                // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
-                const loop = () => {
-                    const iteration = tokenMap.next();
-                    store
-                        .get(iteration.value.id)
-                        .then((mapFrameFromStore) => {
-                        mapFrameInStore = mapFrameFromStore;
-                        if (!clone) {
-                            clone = RabinKarp.createClone(tokenMap.getFormat(), iteration.value, mapFrameInStore);
-                        }
-                    }, () => {
-                        if (clone && this.validate(clone)) {
-                            clones.push(clone);
-                        }
-                        clone = null;
-                        if (iteration.value.id) {
-                            return store.set(iteration.value.id, iteration.value);
-                        }
-                    })
-                        .finally(() => {
-                        if (!iteration.done) {
-                            if (clone) {
-                                clone = RabinKarp.enlargeClone(clone, iteration.value, mapFrameInStore);
-                            }
-                            loop();
-                        }
-                        else {
-                            resolve(clones);
-                        }
-                    });
-                };
-                loop();
-            }));
-        });
-    }
-    validate(clone) {
-        const validation = validators_1.runCloneValidators(clone, this.options, this.cloneValidators);
-        if (validation.status) {
-            this.eventEmitter.emit('CLONE_FOUND', { clone });
-        }
-        else {
-            this.eventEmitter.emit('CLONE_SKIPPED', { clone, validation });
-        }
-        return validation.status;
-    }
-    static createClone(format, mapFrameA, mapFrameB) {
-        return {
-            format,
-            foundDate: new Date().getTime(),
-            duplicationA: {
-                sourceId: mapFrameA.sourceId,
-                start: mapFrameA.start.loc.start,
-                end: mapFrameA.end.loc.end,
-                range: [mapFrameA.start.range[0], mapFrameA.end.range[1]],
-            },
-            duplicationB: {
-                sourceId: mapFrameB.sourceId,
-                start: mapFrameB.start.loc.start,
-                end: mapFrameB.end.loc.end,
-                range: [mapFrameB.start.range[0], mapFrameB.end.range[1]],
-            },
-        };
-    }
-    static enlargeClone(clone, mapFrameA, mapFrameB) {
-        clone.duplicationA.range[1] = mapFrameA.end.range[1];
-        clone.duplicationA.end = mapFrameA.end.loc.end;
-        clone.duplicationB.range[1] = mapFrameB.end.range[1];
-        clone.duplicationB.end = mapFrameB.end.loc.end;
-        return clone;
-    }
-}
-exports.RabinKarp = RabinKarp;
-//# sourceMappingURL=rabin-karp.js.map
-
-/***/ }),
-
-/***/ 67799:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-class Statistic {
-    constructor(options) {
-        this.options = options;
-        this.statistic = {
-            detectionDate: new Date().toISOString(),
-            formats: {},
-            total: Statistic.getDefaultStatistic(),
-        };
-    }
-    static getDefaultStatistic() {
-        return {
-            lines: 0,
-            tokens: 0,
-            sources: 0,
-            clones: 0,
-            duplicatedLines: 0,
-            duplicatedTokens: 0,
-            percentage: 0,
-            percentageTokens: 0,
-            newDuplicatedLines: 0,
-            newClones: 0,
-        };
-    }
-    subscribe() {
-        return {
-            CLONE_FOUND: this.cloneFound.bind(this),
-            START_DETECTION: this.matchSource.bind(this),
-        };
-    }
-    getStatistic() {
-        return this.statistic;
-    }
-    cloneFound(payload) {
-        const { clone } = payload;
-        const id = clone.duplicationA.sourceId;
-        const id2 = clone.duplicationB.sourceId;
-        const linesCount = clone.duplicationA.end.line - clone.duplicationA.start.line;
-        const duplicatedTokens = clone.duplicationA.end.position - clone.duplicationA.start.position;
-        this.statistic.total.clones++;
-        this.statistic.total.duplicatedLines += linesCount;
-        this.statistic.total.duplicatedTokens += duplicatedTokens;
-        this.statistic.formats[clone.format].total.clones++;
-        this.statistic.formats[clone.format].total.duplicatedLines += linesCount;
-        this.statistic.formats[clone.format].total.duplicatedTokens += duplicatedTokens;
-        this.statistic.formats[clone.format].sources[id].clones++;
-        this.statistic.formats[clone.format].sources[id].duplicatedLines += linesCount;
-        this.statistic.formats[clone.format].sources[id].duplicatedTokens += duplicatedTokens;
-        this.statistic.formats[clone.format].sources[id2].clones++;
-        this.statistic.formats[clone.format].sources[id2].duplicatedLines += linesCount;
-        this.statistic.formats[clone.format].sources[id2].duplicatedTokens += duplicatedTokens;
-        this.updatePercentage(clone.format);
-    }
-    matchSource(payload) {
-        const { source } = payload;
-        const format = source.getFormat();
-        if (!(format in this.statistic.formats)) {
-            this.statistic.formats[format] = {
-                sources: {},
-                total: Statistic.getDefaultStatistic(),
-            };
-        }
-        this.statistic.total.sources++;
-        this.statistic.total.lines += source.getLinesCount();
-        this.statistic.total.tokens += source.getTokensCount();
-        this.statistic.formats[format].total.sources++;
-        this.statistic.formats[format].total.lines += source.getLinesCount();
-        this.statistic.formats[format].total.tokens += source.getTokensCount();
-        this.statistic.formats[format].sources[source.getId()] =
-            this.statistic.formats[format].sources[source.getId()] || Statistic.getDefaultStatistic();
-        this.statistic.formats[format].sources[source.getId()].sources = 1;
-        this.statistic.formats[format].sources[source.getId()].lines += source.getLinesCount();
-        this.statistic.formats[format].sources[source.getId()].tokens += source.getTokensCount();
-        this.updatePercentage(format);
-    }
-    updatePercentage(format) {
-        this.statistic.total.percentage = Statistic.calculatePercentage(this.statistic.total.lines, this.statistic.total.duplicatedLines);
-        this.statistic.total.percentageTokens = Statistic.calculatePercentage(this.statistic.total.tokens, this.statistic.total.duplicatedTokens);
-        this.statistic.formats[format].total.percentage = Statistic.calculatePercentage(this.statistic.formats[format].total.lines, this.statistic.formats[format].total.duplicatedLines);
-        this.statistic.formats[format].total.percentageTokens = Statistic.calculatePercentage(this.statistic.formats[format].total.tokens, this.statistic.formats[format].total.duplicatedTokens);
-        Object.entries(this.statistic.formats[format].sources).forEach(([id, stat]) => {
-            this.statistic.formats[format].sources[id].percentage = Statistic.calculatePercentage(stat.lines, stat.duplicatedLines);
-            this.statistic.formats[format].sources[id].percentageTokens = Statistic.calculatePercentage(stat.tokens, stat.duplicatedTokens);
-        });
-    }
-    static calculatePercentage(total, cloned) {
-        return total ? Math.round((10000 * cloned) / total) / 100 : 0.0;
-    }
-}
-exports.Statistic = Statistic;
-//# sourceMappingURL=statistic.js.map
-
-/***/ }),
-
-/***/ 54628:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-class MemoryStore {
-    constructor() {
-        this.values = {};
-    }
-    namespace(namespace) {
-        this._namespace = namespace;
-        this.values[namespace] = this.values[namespace] || {};
-    }
-    get(key) {
-        return new Promise((resolve, reject) => {
-            if (key in this.values[this._namespace]) {
-                resolve(this.values[this._namespace][key]);
-            }
-            else {
-                reject(new Error('not found'));
-            }
-        });
-    }
-    set(key, value) {
-        this.values[this._namespace][key] = value;
-        return Promise.resolve(value);
-    }
-    close() {
-        this.values = {};
-    }
-}
-exports.MemoryStore = MemoryStore;
-//# sourceMappingURL=memory.js.map
-
-/***/ }),
-
-/***/ 82218:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-function __export(m) {
-    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
-}
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-__export(__nccwpck_require__(52214));
-__export(__nccwpck_require__(43865));
-//# sourceMappingURL=index.js.map
-
-/***/ }),
-
-/***/ 52214:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-class LinesLengthCloneValidator {
-    validate(clone, options) {
-        const lines = clone.duplicationA.end.line - clone.duplicationA.start.line;
-        const status = lines >= options.minLines;
-        return {
-            status,
-            message: status ? ['ok'] : [`Lines of code less then limit (${lines} < ${options.minLines})`],
-        };
-    }
-}
-exports.LinesLengthCloneValidator = LinesLengthCloneValidator;
-//# sourceMappingURL=lines-length-clone.validator.js.map
-
-/***/ }),
-
-/***/ 43865:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-function runCloneValidators(clone, options, validators) {
-    return validators.reduce((acc, validator) => {
-        const res = validator.validate(clone, options);
-        return Object.assign(Object.assign({}, acc), { status: res.status && acc.status, message: res.message ? [...acc.message, ...res.message] : acc.message });
-    }, { status: true, message: [], clone });
-}
-exports.runCloneValidators = runCloneValidators;
-//# sourceMappingURL=validator.js.map
-
-/***/ }),
-
-/***/ 51908:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const core_1 = __nccwpck_require__(84511);
-const fast_glob_1 = __nccwpck_require__(43664);
-const tokenizer_1 = __nccwpck_require__(92080);
-const fs_extra_1 = __nccwpck_require__(5630);
-const safe_1 = __nccwpck_require__(41997);
-const fs_1 = __nccwpck_require__(35747);
-const bytes = __nccwpck_require__(86966);
-function isFile(path) {
-    try {
-        const stat = fs_1.lstatSync(path);
-        return stat.isFile();
-    }
-    catch (e) {
-        // lstatSync throws an error if path doesn't exist
-        return false;
-    }
-}
-function skipNotSupportedFormats(options) {
-    return (entry) => {
-        const { path } = entry;
-        const format = tokenizer_1.getFormatByFile(path, options.formatsExts);
-        const shouldNotSkip = format && options.format && options.format.includes(format);
-        if ((options.debug || options.verbose) && !shouldNotSkip) {
-            console.log(`File ${path} skipped! Format "${format}" does not included to supported formats.`);
-        }
-        return shouldNotSkip;
-    };
-}
-function skipBigFiles(options) {
-    return (entry) => {
-        const { stats, path } = entry;
-        const shouldSkip = bytes.parse(stats.size) > bytes.parse(core_1.getOption('maxSize', options));
-        if (options.debug && shouldSkip) {
-            console.log(`File ${path} skipped! Size more then limit (${bytes(stats.size)} > ${core_1.getOption('maxSize', options)})`);
-        }
-        return !shouldSkip;
-    };
-}
-function skipFilesIfLinesOfContentNotInLimits(options) {
-    return (entry) => {
-        const { path, content } = entry;
-        const lines = content.split('\n').length;
-        const minLines = core_1.getOption('minLines', options);
-        const maxLines = core_1.getOption('maxLines', options);
-        if (lines < minLines || lines > maxLines) {
-            if ((options.debug || options.verbose)) {
-                console.log(safe_1.grey(`File ${path} skipped! Code lines=${lines} not in limits (${minLines}:${maxLines})`));
-            }
-            return false;
-        }
-        return true;
-    };
-}
-function addContentToEntry(entry) {
-    const { path } = entry;
-    const content = fs_extra_1.readFileSync(path).toString();
-    return Object.assign(Object.assign({}, entry), { content });
-}
-function getFilesToDetect(options) {
-    const pattern = options.pattern || '**/*';
-    const patterns = options.path.map((path) => {
-        if (isFile(path)) {
-            return path;
-        }
-        return path.substr(path.length - 1) === '/' ? `${path}${pattern}` : `${path}/${pattern}`;
-    });
-    return fast_glob_1.sync(patterns, {
-        ignore: options.ignore,
-        onlyFiles: true,
-        dot: true,
-        stats: true,
-        absolute: options.absolute,
-        followSymbolicLinks: !options.noSymlinks,
-    })
-        .filter(skipNotSupportedFormats(options))
-        .filter(skipBigFiles(options))
-        .map(addContentToEntry)
-        .filter(skipFilesIfLinesOfContentNotInLimits(options));
-}
-exports.getFilesToDetect = getFilesToDetect;
-//# sourceMappingURL=files.js.map
-
-/***/ }),
-
-/***/ 74574:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const blamer_1 = __nccwpck_require__(56781);
-class BlamerHook {
-    process(clones) {
-        return Promise.all(clones.map((clone) => BlamerHook.blameLines(clone)));
-    }
-    static blameLines(clone) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const blamer = new blamer_1.default();
-            const blamedFileA = yield blamer.blameByFile(clone.duplicationA.sourceId);
-            const blamedFileB = yield blamer.blameByFile(clone.duplicationB.sourceId);
-            clone.duplicationA.blame = BlamerHook.getBlamedLines(blamedFileA, clone.duplicationA.start.line, clone.duplicationA.end.line);
-            clone.duplicationB.blame = BlamerHook.getBlamedLines(blamedFileB, clone.duplicationB.start.line, clone.duplicationB.end.line);
-            return clone;
-        });
-    }
-    static getBlamedLines(blamedFiles, start, end) {
-        // TODO rewrite the method
-        const [file] = Object.keys(blamedFiles);
-        const result = {};
-        Object.keys(blamedFiles[file])
-            .filter((lineNumber) => {
-            return Number(lineNumber) >= start && Number(lineNumber) <= end;
-        })
-            .map((lineNumber) => blamedFiles[file][lineNumber])
-            .forEach((info) => {
-            result[info.line] = info;
-        });
-        return result;
-    }
-}
-exports.BlamerHook = BlamerHook;
-//# sourceMappingURL=blamer.js.map
-
-/***/ }),
-
-/***/ 44810:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const fs_1 = __nccwpck_require__(35747);
-class FragmentsHook {
-    process(clones) {
-        return Promise.all(clones.map((clone) => FragmentsHook.addFragments(clone)));
-    }
-    static addFragments(clone) {
-        const codeA = fs_1.readFileSync(clone.duplicationA.sourceId).toString();
-        const codeB = fs_1.readFileSync(clone.duplicationB.sourceId).toString();
-        clone.duplicationA.fragment = codeA.substring(clone.duplicationA.range[0], clone.duplicationA.range[1]);
-        clone.duplicationB.fragment = codeB.substring(clone.duplicationB.range[0], clone.duplicationB.range[1]);
-        return clone;
-    }
-}
-exports.FragmentsHook = FragmentsHook;
-//# sourceMappingURL=fragment.js.map
-
-/***/ }),
-
-/***/ 88131:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-function __export(m) {
-    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
-}
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-__export(__nccwpck_require__(74574));
-__export(__nccwpck_require__(44810));
-//# sourceMappingURL=index.js.map
-
-/***/ }),
-
-/***/ 88241:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const core_1 = __nccwpck_require__(84511);
-const tokenizer_1 = __nccwpck_require__(92080);
-const validators_1 = __nccwpck_require__(20733);
-class InFilesDetector {
-    constructor(tokenizer, store, statistic, options) {
-        this.tokenizer = tokenizer;
-        this.store = store;
-        this.statistic = statistic;
-        this.options = options;
-        this.reporters = [];
-        this.subscribes = [];
-        this.postHooks = [];
-        this.registerSubscriber(this.statistic);
-    }
-    registerReporter(reporter) {
-        this.reporters.push(reporter);
-    }
-    registerSubscriber(subscriber) {
-        this.subscribes.push(subscriber);
-    }
-    registerHook(hook) {
-        this.postHooks.push(hook);
-    }
-    detect(fls) {
-        const files = fls.filter((f) => !!f);
-        if (files.length === 0) {
-            return Promise.resolve([]);
-        }
-        const options = this.options;
-        const hooks = [...this.postHooks];
-        const store = this.store;
-        const validators = [];
-        if (options.skipLocal) {
-            validators.push(new validators_1.SkipLocalValidator());
-        }
-        const detector = new core_1.Detector(this.tokenizer, store, validators, options);
-        this.subscribes.forEach((listener) => {
-            Object
-                .entries(listener.subscribe())
-                .map(([event, handler]) => detector.on(event, handler));
-        });
-        const detect = (entry, clones = []) => {
-            const { path, content } = entry;
-            const format = tokenizer_1.getFormatByFile(path, options.formatsExts);
-            return detector
-                .detect(path, content, format)
-                .then((clns) => {
-                if (clns) {
-                    clones.push(...clns);
-                }
-                const file = files.pop();
-                if (file) {
-                    return detect(file, clones);
-                }
-                return clones;
-            });
-        };
-        const processHooks = (hook, detectedClones) => {
-            return hook
-                .process(detectedClones)
-                .then((clones) => {
-                const nextHook = hooks.pop();
-                if (nextHook) {
-                    return processHooks(nextHook, clones);
-                }
-                return clones;
-            });
-        };
-        return detect(files.pop())
-            .then((clones) => {
-            const hook = hooks.pop();
-            if (hook) {
-                return processHooks(hook, clones);
-            }
-            return clones;
-        })
-            .then((clones) => {
-            const statistic = this.statistic.getStatistic();
-            this.reporters.forEach((reporter) => {
-                reporter.report(clones, statistic);
-            });
-            return clones;
-        });
-    }
-}
-exports.InFilesDetector = InFilesDetector;
-//# sourceMappingURL=in-files-detector.js.map
-
-/***/ }),
-
-/***/ 39148:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-function __export(m) {
-    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
-}
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-__export(__nccwpck_require__(88241));
-__export(__nccwpck_require__(51908));
-__export(__nccwpck_require__(88131));
-__export(__nccwpck_require__(48812));
-__export(__nccwpck_require__(16872));
-__export(__nccwpck_require__(20733));
-__export(__nccwpck_require__(43465));
-//# sourceMappingURL=index.js.map
-
-/***/ }),
-
-/***/ 57959:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const reports_1 = __nccwpck_require__(42083);
-const clone_found_1 = __nccwpck_require__(17304);
-const safe_1 = __nccwpck_require__(41997);
-const Table = __nccwpck_require__(2101);
-const TABLE_OPTIONS = {
-    chars: {
-        top: '',
-        'top-mid': '',
-        'top-left': '',
-        'top-right': '',
-        bottom: '',
-        'bottom-mid': '',
-        'bottom-left': '',
-        'bottom-right': '',
-        left: '',
-        'left-mid': '',
-        mid: '',
-        'mid-mid': '',
-        right: '',
-        'right-mid': '',
-        middle: '│',
-    },
-};
-class ConsoleFullReporter {
-    constructor(options) {
-        this.options = options;
-    }
-    report(clones) {
-        clones.forEach((clone) => {
-            this.cloneFullFound(clone);
-        });
-        console.log(safe_1.grey(`Found ${clones.length} clones.`));
-    }
-    cloneFullFound(clone) {
-        const table = new Table(TABLE_OPTIONS);
-        clone_found_1.cloneFound(clone, this.options);
-        clone.duplicationA.fragment.split('\n').forEach((line, position) => {
-            (table).push(reports_1.generateLine(clone, position, line));
-        });
-        console.log(table.toString());
-        console.log('');
-    }
-}
-exports.ConsoleFullReporter = ConsoleFullReporter;
-//# sourceMappingURL=console-full.js.map
-
-/***/ }),
-
-/***/ 94513:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const safe_1 = __nccwpck_require__(41997);
-const reports_1 = __nccwpck_require__(42083);
-const Table = __nccwpck_require__(2101);
-class ConsoleReporter {
-    constructor(options) {
-        this.options = options;
-    }
-    report(clones, statistic = undefined) {
-        if (statistic && !this.options.silent) {
-            const table = new Table({
-                head: ['Format', 'Files analyzed', 'Total lines', 'Total tokens', 'Clones found', 'Duplicated lines', 'Duplicated tokens'],
-            });
-            Object.keys(statistic.formats)
-                .filter((format) => statistic.formats[format].sources)
-                .forEach((format) => {
-                table.push(reports_1.convertStatisticToArray(format, statistic.formats[format].total));
-            });
-            table.push(reports_1.convertStatisticToArray(safe_1.bold('Total:'), statistic.total));
-            console.log(table.toString());
-            console.log(safe_1.grey(`Found ${clones.length} clones.`));
-        }
-    }
-}
-exports.ConsoleReporter = ConsoleReporter;
-//# sourceMappingURL=console.js.map
-
-/***/ }),
-
-/***/ 54038:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const core_1 = __nccwpck_require__(84511);
-const fs_extra_1 = __nccwpck_require__(5630);
-const safe_1 = __nccwpck_require__(41997);
-const path_1 = __nccwpck_require__(85622);
-const reports_1 = __nccwpck_require__(42083);
-class CSVReporter {
-    constructor(options) {
-        this.options = options;
-    }
-    report(clones, statistic) {
-        const report = [
-            ['Format', 'Files analyzed', 'Total lines', 'Total tokens', 'Clones found', 'Duplicated lines', 'Duplicated tokens'],
-            ...Object.keys(statistic.formats).map((format) => reports_1.convertStatisticToArray(format, statistic.formats[format].total)),
-            reports_1.convertStatisticToArray('Total:', statistic.total)
-        ].map((arr) => arr.join(',')).join('\n');
-        fs_extra_1.ensureDirSync(core_1.getOption('output', this.options));
-        fs_extra_1.writeFileSync(core_1.getOption('output', this.options) + '/jscpd-report.csv', report);
-        console.log(safe_1.green(`CSV report saved to ${path_1.join(this.options.output, 'jscpd-report.csv')}`));
-    }
-}
-exports.CSVReporter = CSVReporter;
-//# sourceMappingURL=csv.js.map
-
-/***/ }),
-
-/***/ 16872:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-function __export(m) {
-    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
-}
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-__export(__nccwpck_require__(94513));
-__export(__nccwpck_require__(57959));
-__export(__nccwpck_require__(78634));
-__export(__nccwpck_require__(54038));
-__export(__nccwpck_require__(91708));
-__export(__nccwpck_require__(9319));
-__export(__nccwpck_require__(87850));
-__export(__nccwpck_require__(42639));
-__export(__nccwpck_require__(39774));
-//# sourceMappingURL=index.js.map
-
-/***/ }),
-
-/***/ 78634:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const fs_extra_1 = __nccwpck_require__(5630);
-const core_1 = __nccwpck_require__(84511);
-const reports_1 = __nccwpck_require__(42083);
-const safe_1 = __nccwpck_require__(41997);
-const path_1 = __nccwpck_require__(85622);
-class JsonReporter {
-    constructor(options) {
-        this.options = options;
-    }
-    generateJson(clones, statistics) {
-        return {
-            statistics,
-            duplicates: clones.map(clone => this.cloneFound(clone))
-        };
-    }
-    report(clones, statistic) {
-        const json = this.generateJson(clones, statistic);
-        fs_extra_1.ensureDirSync(core_1.getOption('output', this.options));
-        fs_extra_1.writeFileSync(core_1.getOption('output', this.options) + '/jscpd-report.json', JSON.stringify(json, null, '  '));
-        console.log(safe_1.green(`JSON report saved to ${path_1.join(this.options.output, 'jscpd-report.json')}`));
-    }
-    cloneFound(clone) {
-        const startLineA = clone.duplicationA.start.line;
-        const endLineA = clone.duplicationA.end.line;
-        const startLineB = clone.duplicationB.start.line;
-        const endLineB = clone.duplicationB.end.line;
-        return {
-            format: clone.format,
-            lines: endLineA - startLineA + 1,
-            fragment: clone.duplicationA.fragment,
-            tokens: 0,
-            firstFile: {
-                name: reports_1.getPath(clone.duplicationA.sourceId, this.options),
-                start: startLineA,
-                end: endLineA,
-                startLoc: clone.duplicationA.start,
-                endLoc: clone.duplicationA.end,
-                blame: clone.duplicationA.blame,
-            },
-            secondFile: {
-                name: reports_1.getPath(clone.duplicationB.sourceId, this.options),
-                start: startLineB,
-                end: endLineB,
-                startLoc: clone.duplicationB.start,
-                endLoc: clone.duplicationB.end,
-                blame: clone.duplicationB.blame,
-            },
-        };
-    }
-}
-exports.JsonReporter = JsonReporter;
-//# sourceMappingURL=json.js.map
-
-/***/ }),
-
-/***/ 91708:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const core_1 = __nccwpck_require__(84511);
-const fs_extra_1 = __nccwpck_require__(5630);
-const safe_1 = __nccwpck_require__(41997);
-const path_1 = __nccwpck_require__(85622);
-const reports_1 = __nccwpck_require__(42083);
-const table = __nccwpck_require__(41062);
-class MarkdownReporter {
-    constructor(options) {
-        this.options = options;
-    }
-    report(clones, statistic) {
-        const report = `
-# Copy/paste detection report
-
-> Duplications detection: Found ${clones.length} exact clones with ${statistic.total.duplicatedLines}(${statistic.total.percentage}%) duplicated lines in ${statistic.total.sources} (${Object.keys(statistic.formats).length} formats) files.
-
-${table([
-            ['Format', 'Files analyzed', 'Total lines', 'Total tokens', 'Clones found', 'Duplicated lines', 'Duplicated tokens'],
-            ...Object.keys(statistic.formats).map((format) => reports_1.convertStatisticToArray(format, statistic.formats[format].total)),
-            reports_1.convertStatisticToArray('Total:', statistic.total).map(item => `**${item}**`)
-        ])}
-`;
-        fs_extra_1.ensureDirSync(core_1.getOption('output', this.options));
-        fs_extra_1.writeFileSync(core_1.getOption('output', this.options) + '/jscpd-report.md', report);
-        console.log(safe_1.green(`Markdown report saved to ${path_1.join(this.options.output, 'jscpd-report.md')}`));
-    }
-}
-exports.MarkdownReporter = MarkdownReporter;
-//# sourceMappingURL=markdown.js.map
-
-/***/ }),
-
-/***/ 87850:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const safe_1 = __nccwpck_require__(41997);
-class SilentReporter {
-    report(clones, statistic) {
-        if (statistic) {
-            console.log(`Duplications detection: Found ${safe_1.bold(clones.length.toString())} ` +
-                `exact clones with ${safe_1.bold(statistic.total.duplicatedLines.toString())}(${statistic.total.percentage}%) ` +
-                `duplicated lines in ${safe_1.bold(statistic.total.sources.toString())} ` +
-                `(${Object.keys(statistic.formats).length} formats) files.`);
-        }
-    }
-}
-exports.SilentReporter = SilentReporter;
-//# sourceMappingURL=silent.js.map
-
-/***/ }),
-
-/***/ 42639:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const safe_1 = __nccwpck_require__(41997);
-class ThresholdReporter {
-    constructor(options) {
-        this.options = options;
-    }
-    report(clones, statistic) {
-        if (statistic && this.options.threshold !== undefined && this.options.threshold < statistic.total.percentage) {
-            const message = `ERROR: jscpd found too many duplicates (${statistic.total.percentage}%) over threshold (${this.options.threshold}%)`;
-            console.error(safe_1.red(message));
-            throw new Error(message);
-        }
-    }
-}
-exports.ThresholdReporter = ThresholdReporter;
-//# sourceMappingURL=threshold.js.map
-
-/***/ }),
-
-/***/ 39774:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const reports_1 = __nccwpck_require__(42083);
-class XcodeReporter {
-    constructor(options) {
-        this.options = options;
-    }
-    report(clones) {
-        clones.forEach((clone) => {
-            this.cloneFound(clone);
-        });
-        console.log(`Found ${clones.length} clones.`);
-    }
-    cloneFound(clone) {
-        const pathA = reports_1.getPath(clone.duplicationA.sourceId, Object.assign(Object.assign({}, this.options), { absolute: true }));
-        const pathB = reports_1.getPath(clone.duplicationB.sourceId, this.options);
-        const startLineA = clone.duplicationA.start.line;
-        const characterA = clone.duplicationA.start.column;
-        const endLineA = clone.duplicationA.end.line;
-        const startLineB = clone.duplicationB.start.line;
-        const endLineB = clone.duplicationB.end.line;
-        console.log(`${pathA}:${startLineA}:${characterA}: warning: Found ${endLineA - startLineA} lines (${startLineA}-${endLineA}) duplicated on file ${pathB} (${startLineB}-${endLineB})`);
-    }
-}
-exports.XcodeReporter = XcodeReporter;
-//# sourceMappingURL=xcode.js.map
-
-/***/ }),
-
-/***/ 9319:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const fs_1 = __nccwpck_require__(35747);
-const fs_extra_1 = __nccwpck_require__(5630);
-const core_1 = __nccwpck_require__(84511);
-const reports_1 = __nccwpck_require__(42083);
-const safe_1 = __nccwpck_require__(41997);
-const path_1 = __nccwpck_require__(85622);
-class XmlReporter {
-    constructor(options) {
-        this.options = options;
-    }
-    report(clones) {
-        let xmlDoc = '<?xml version="1.0" encoding="UTF-8" ?>';
-        xmlDoc += '<pmd-cpd>';
-        clones.forEach((clone) => {
-            xmlDoc = `${xmlDoc}
-      <duplication lines="${clone.duplicationA.end.line - clone.duplicationA.start.line}">
-            <file path="${reports_1.escapeXml(reports_1.getPath(clone.duplicationA.sourceId, this.options))}" line="${clone.duplicationA.start.line}">
-              <codefragment><![CDATA[${clone.duplicationA.fragment.replace(/]]>/i, 'CDATA_END')}]]></codefragment>
-            </file>
-            <file path="${reports_1.escapeXml(reports_1.getPath(clone.duplicationB.sourceId, this.options))}" line="${clone.duplicationB.start.line}">
-              <codefragment><![CDATA[${clone.duplicationB.fragment.replace(/]]>/i, 'CDATA_END')}]]></codefragment>
-            </file>
-            <codefragment><![CDATA[${clone.duplicationA.fragment.replace(/]]>/i, 'CDATA_END')}]]></codefragment>
-        </duplication>
-      `;
-        });
-        xmlDoc += '</pmd-cpd>';
-        fs_extra_1.ensureDirSync(core_1.getOption('output', this.options));
-        fs_1.writeFileSync(core_1.getOption('output', this.options) + '/jscpd-report.xml', xmlDoc);
-        console.log(safe_1.green(`XML report saved to ${path_1.join(this.options.output, 'jscpd-report.xml')}`));
-    }
-}
-exports.XmlReporter = XmlReporter;
-//# sourceMappingURL=xml.js.map
-
-/***/ }),
-
-/***/ 48812:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-function __export(m) {
-    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
-}
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-__export(__nccwpck_require__(14941));
-__export(__nccwpck_require__(10865));
-//# sourceMappingURL=index.js.map
-
-/***/ }),
-
-/***/ 14941:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const clone_found_1 = __nccwpck_require__(17304);
-class ProgressSubscriber {
-    constructor(options) {
-        this.options = options;
-    }
-    subscribe() {
-        return {
-            CLONE_FOUND: (payload) => clone_found_1.cloneFound(payload.clone, this.options),
-        };
-    }
-}
-exports.ProgressSubscriber = ProgressSubscriber;
-//# sourceMappingURL=progress.js.map
-
-/***/ }),
-
-/***/ 10865:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const safe_1 = __nccwpck_require__(41997);
-class VerboseSubscriber {
-    constructor(options) {
-        this.options = options;
-    }
-    subscribe() {
-        return {
-            'CLONE_FOUND': (payload) => {
-                const { clone } = payload;
-                console.log(safe_1.yellow('CLONE_FOUND'));
-                console.log(safe_1.grey(JSON.stringify(clone, null, '\t')));
-            },
-            'CLONE_SKIPPED': (payload) => {
-                const { validation } = payload;
-                console.log(safe_1.yellow('CLONE_SKIPPED'));
-                console.log(safe_1.grey('Clone skipped: ' + validation.message.join(' ')));
-            },
-            'START_DETECTION': (payload) => {
-                const { source } = payload;
-                console.log(safe_1.yellow('START_DETECTION'));
-                console.log(safe_1.grey('Start detection for source id=' + source.getId() + ' format=' + source.getFormat()));
-            },
-        };
-    }
-}
-exports.VerboseSubscriber = VerboseSubscriber;
-//# sourceMappingURL=verbose.js.map
-
-/***/ }),
-
-/***/ 17304:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const safe_1 = __nccwpck_require__(41997);
-const reports_1 = __nccwpck_require__(42083);
-function cloneFound(clone, options) {
-    const { duplicationA, duplicationB, format, isNew } = clone;
-    console.log('Clone found (' + format + '):' + (isNew ? safe_1.red('*') : ''));
-    console.log(` - ${reports_1.getPathConsoleString(duplicationA.sourceId, options)} [${reports_1.getSourceLocation(duplicationA.start, duplicationA.end)}] (${duplicationA.end.line - duplicationA.start.line} lines${duplicationA.end.position ? ', ' + (duplicationA.end.position - duplicationA.start.position) + ' tokens' : ''})`);
-    console.log(`   ${reports_1.getPathConsoleString(duplicationB.sourceId, options)} [${reports_1.getSourceLocation(duplicationB.start, duplicationB.end)}]`);
-    console.log('');
-}
-exports.cloneFound = cloneFound;
-//# sourceMappingURL=clone-found.js.map
-
-/***/ }),
-
-/***/ 43465:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-function parseFormatsExtensions(extensions = '') {
-    const result = {};
-    if (!extensions) {
-        return undefined;
-    }
-    extensions.split(';').forEach((format) => {
-        const pair = format.split(':');
-        result[pair[0]] = pair[1].split(',');
-    });
-    return result;
-}
-exports.parseFormatsExtensions = parseFormatsExtensions;
-//# sourceMappingURL=options.js.map
-
-/***/ }),
-
-/***/ 42083:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const path_1 = __nccwpck_require__(85622);
-const process_1 = __nccwpck_require__(61765);
-const safe_1 = __nccwpck_require__(41997);
-exports.compareDates = (firstDate, secondDate) => {
-    const first = new Date(firstDate);
-    const second = new Date(secondDate);
-    switch (true) {
-        case first < second:
-            return '=>';
-        case first > second:
-            return '<=';
-        default:
-            return '==';
-    }
-};
-function escapeXml(unsafe) {
-    return unsafe.replace(/[<>&'"]/g, function (c) {
-        switch (c) {
-            case '<': return '&lt;';
-            case '>': return '&gt;';
-            case '&': return '&amp;';
-            case '\'': return '&apos;';
-            case '"': return '&quot;';
-        }
-    });
-}
-exports.escapeXml = escapeXml;
-function getPath(path, options) {
-    return options.absolute ? path : path_1.relative(process_1.cwd(), path);
-}
-exports.getPath = getPath;
-function getPathConsoleString(path, options) {
-    return safe_1.bold(safe_1.green(getPath(path, options)));
-}
-exports.getPathConsoleString = getPathConsoleString;
-function getSourceLocation(start, end) {
-    return `${start.line}:${start.column} - ${end.line}:${end.column}`;
-}
-exports.getSourceLocation = getSourceLocation;
-function generateLine(clone, position, line) {
-    const lineNumberA = (clone.duplicationA.start.line + position).toString();
-    const lineNumberB = (clone.duplicationB.start.line + position).toString();
-    if (clone.duplicationA.blame && clone.duplicationB.blame) {
-        return [
-            lineNumberA,
-            clone.duplicationA.blame[lineNumberA] ? clone.duplicationA.blame[lineNumberA].author : '',
-            clone.duplicationA.blame[lineNumberA] && clone.duplicationB.blame[lineNumberB]
-                ? exports.compareDates(clone.duplicationA.blame[lineNumberA].date, clone.duplicationB.blame[lineNumberB].date)
-                : '',
-            lineNumberB,
-            clone.duplicationB.blame[lineNumberB] ? clone.duplicationB.blame[lineNumberB].author : '',
-            safe_1.grey(line),
-        ];
-    }
-    else {
-        return [lineNumberA, lineNumberB, safe_1.grey(line)];
-    }
-}
-exports.generateLine = generateLine;
-function convertStatisticToArray(format, statistic) {
-    return [
-        format,
-        `${statistic.sources}`,
-        `${statistic.lines}`,
-        `${statistic.tokens}`,
-        `${statistic.clones}`,
-        `${statistic.duplicatedLines} (${statistic.percentage}%)`,
-        `${statistic.duplicatedTokens} (${statistic.percentageTokens}%)`,
-    ];
-}
-exports.convertStatisticToArray = convertStatisticToArray;
-//# sourceMappingURL=reports.js.map
-
-/***/ }),
-
-/***/ 20733:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-function __export(m) {
-    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
-}
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-__export(__nccwpck_require__(69653));
-//# sourceMappingURL=index.js.map
-
-/***/ }),
-
-/***/ 69653:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const core_1 = __nccwpck_require__(84511);
-const path_1 = __nccwpck_require__(85622);
-class SkipLocalValidator {
-    validate(clone, options) {
-        const status = !this.shouldSkipClone(clone, options);
-        return {
-            status,
-            clone,
-            message: [
-                `Sources of duplication located in same local folder (${clone.duplicationA.sourceId}, ${clone.duplicationB.sourceId})`
-            ]
-        };
-    }
-    shouldSkipClone(clone, options) {
-        const path = core_1.getOption('path', options);
-        return path.some((dir) => SkipLocalValidator.isRelative(clone.duplicationA.sourceId, dir) && SkipLocalValidator.isRelative(clone.duplicationB.sourceId, dir));
-    }
-    static isRelative(file, path) {
-        const rel = path_1.relative(path, file);
-        return rel !== '' && !rel.startsWith('..') && !path_1.isAbsolute(rel);
-    }
-}
-exports.SkipLocalValidator = SkipLocalValidator;
-//# sourceMappingURL=skip-local.validator.js.map
-
-/***/ }),
-
-/***/ 85049:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const path_1 = __nccwpck_require__(85622);
-exports.FORMATS = {
-    abap: {
-        exts: [],
-    },
-    actionscript: {
-        exts: ['as'],
-    },
-    ada: {
-        exts: ['ada'],
-    },
-    apacheconf: {
-        exts: [],
-    },
-    apl: {
-        exts: ['apl'],
-    },
-    applescript: {
-        exts: [],
-    },
-    arduino: {
-        exts: [],
-    },
-    arff: {
-        exts: [],
-    },
-    asciidoc: {
-        exts: [],
-    },
-    asm6502: {
-        exts: [],
-    },
-    aspnet: {
-        exts: ['asp', 'aspx'],
-    },
-    autohotkey: {
-        exts: [],
-    },
-    autoit: {
-        exts: [],
-    },
-    bash: {
-        exts: ['sh', 'ksh', 'bash'],
-    },
-    basic: {
-        exts: ['bas'],
-    },
-    batch: {
-        exts: [],
-    },
-    bison: {
-        exts: [],
-    },
-    brainfuck: {
-        exts: ['b', 'bf'],
-    },
-    bro: {
-        exts: [],
-    },
-    c: {
-        exts: ['c', 'z80'],
-    },
-    'c-header': {
-        exts: ['h'],
-        parent: 'c',
-    },
-    clike: {
-        exts: [],
-    },
-    clojure: {
-        exts: ['cljs', 'clj', 'cljc', 'cljx', 'edn'],
-    },
-    coffeescript: {
-        exts: ['coffee'],
-    },
-    comments: {
-        exts: []
-    },
-    cpp: {
-        exts: ['cpp', 'c++', 'cc', 'cxx'],
-    },
-    'cpp-header': {
-        exts: ['hpp', 'h++', 'hh', 'hxx'],
-        parent: 'cpp',
-    },
-    crystal: {
-        exts: ['cr'],
-    },
-    csharp: {
-        exts: ['cs'],
-    },
-    csp: {
-        exts: [],
-    },
-    'css-extras': {
-        exts: [],
-    },
-    css: {
-        exts: ['css', 'gss'],
-    },
-    d: {
-        exts: ['d'],
-    },
-    dart: {
-        exts: ['dart'],
-    },
-    diff: {
-        exts: ['diff', 'patch'],
-    },
-    django: {
-        exts: [],
-    },
-    docker: {
-        exts: [],
-    },
-    eiffel: {
-        exts: ['e'],
-    },
-    elixir: {
-        exts: [],
-    },
-    elm: {
-        exts: ['elm'],
-    },
-    erb: {
-        exts: [],
-    },
-    erlang: {
-        exts: ['erl', 'erlang'],
-    },
-    flow: {
-        exts: [],
-    },
-    fortran: {
-        exts: ['f', 'for', 'f77', 'f90'],
-    },
-    fsharp: {
-        exts: ['fs'],
-    },
-    gedcom: {
-        exts: [],
-    },
-    gherkin: {
-        exts: ['feature'],
-    },
-    git: {
-        exts: [],
-    },
-    glsl: {
-        exts: [],
-    },
-    go: {
-        exts: ['go'],
-    },
-    graphql: {
-        exts: ['graphql'],
-    },
-    groovy: {
-        exts: ['groovy', 'gradle'],
-    },
-    haml: {
-        exts: ['haml'],
-    },
-    handlebars: {
-        exts: ['hb', 'hbs', 'handlebars'],
-    },
-    haskell: {
-        exts: ['hs', 'lhs '],
-    },
-    haxe: {
-        exts: ['hx', 'hxml'],
-    },
-    hpkp: {
-        exts: [],
-    },
-    hsts: {
-        exts: [],
-    },
-    http: {
-        exts: [],
-    },
-    ichigojam: {
-        exts: [],
-    },
-    icon: {
-        exts: [],
-    },
-    inform7: {
-        exts: [],
-    },
-    ini: {
-        exts: ['ini'],
-    },
-    io: {
-        exts: [],
-    },
-    j: {
-        exts: [],
-    },
-    java: {
-        exts: ['java'],
-    },
-    javascript: {
-        exts: ['js', 'es', 'es6'],
-    },
-    jolie: {
-        exts: [],
-    },
-    json: {
-        exts: ['json', 'map', 'jsonld'],
-    },
-    jsx: {
-        exts: ['jsx'],
-    },
-    julia: {
-        exts: ['jl'],
-    },
-    keymap: {
-        exts: [],
-    },
-    kotlin: {
-        exts: ['kt', 'kts'],
-    },
-    latex: {
-        exts: ['tex'],
-    },
-    less: {
-        exts: ['less'],
-    },
-    liquid: {
-        exts: [],
-    },
-    lisp: {
-        exts: ['cl', 'lisp', 'el'],
-    },
-    livescript: {
-        exts: ['ls'],
-    },
-    lolcode: {
-        exts: [],
-    },
-    lua: {
-        exts: ['lua'],
-    },
-    makefile: {
-        exts: [],
-    },
-    markdown: {
-        exts: ['md', 'markdown', 'mkd', 'txt'],
-    },
-    markup: {
-        exts: ['html', 'htm', 'xml', 'xsl', 'xslt', 'svg', 'vue', 'ejs', 'jsp'],
-    },
-    matlab: {
-        exts: [],
-    },
-    mel: {
-        exts: [],
-    },
-    mizar: {
-        exts: [],
-    },
-    monkey: {
-        exts: [],
-    },
-    n4js: {
-        exts: [],
-    },
-    nasm: {
-        exts: [],
-    },
-    nginx: {
-        exts: [],
-    },
-    nim: {
-        exts: [],
-    },
-    nix: {
-        exts: [],
-    },
-    nsis: {
-        exts: ['nsh', 'nsi'],
-    },
-    objectivec: {
-        exts: ['m', 'mm'],
-    },
-    ocaml: {
-        exts: ['ocaml', 'ml', 'mli', 'mll', 'mly'],
-    },
-    opencl: {
-        exts: [],
-    },
-    oz: {
-        exts: ['oz'],
-    },
-    parigp: {
-        exts: [],
-    },
-    pascal: {
-        exts: ['pas', 'p'],
-    },
-    perl: {
-        exts: ['pl', 'pm'],
-    },
-    php: {
-        exts: ['php', 'phtml'],
-    },
-    plsql: {
-        exts: ['plsql'],
-    },
-    powershell: {
-        exts: ['ps1', 'psd1', 'psm1'],
-    },
-    processing: {
-        exts: [],
-    },
-    prolog: {
-        exts: ['pro'],
-    },
-    properties: {
-        exts: ['properties'],
-    },
-    protobuf: {
-        exts: ['proto'],
-    },
-    pug: {
-        exts: ['pug', 'jade'],
-    },
-    puppet: {
-        exts: ['pp', 'puppet'],
-    },
-    pure: {
-        exts: [],
-    },
-    python: {
-        exts: ['py', 'pyx', 'pxd', 'pxi'],
-    },
-    q: {
-        exts: ['q'],
-    },
-    qore: {
-        exts: [],
-    },
-    r: {
-        exts: ['r', 'R'],
-    },
-    reason: {
-        exts: [],
-    },
-    renpy: {
-        exts: [],
-    },
-    rest: {
-        exts: [],
-    },
-    rip: {
-        exts: [],
-    },
-    roboconf: {
-        exts: [],
-    },
-    ruby: {
-        exts: ['rb'],
-    },
-    rust: {
-        exts: ['rs'],
-    },
-    sas: {
-        exts: ['sas'],
-    },
-    sass: {
-        exts: ['sass'],
-    },
-    scala: {
-        exts: ['scala'],
-    },
-    scheme: {
-        exts: ['scm', 'ss'],
-    },
-    scss: {
-        exts: ['scss'],
-    },
-    smalltalk: {
-        exts: ['st'],
-    },
-    smarty: {
-        exts: ['smarty', 'tpl'],
-    },
-    soy: {
-        exts: ['soy'],
-    },
-    sql: {
-        exts: ['sql', 'cql'],
-    },
-    stylus: {
-        exts: ['styl', 'stylus'],
-    },
-    swift: {
-        exts: ['swift'],
-    },
-    tap: {
-        exts: ['tap'],
-    },
-    tcl: {
-        exts: ['tcl'],
-    },
-    textile: {
-        exts: ['textile'],
-    },
-    tsx: {
-        exts: ['tsx'],
-    },
-    tt2: {
-        exts: ['tt2'],
-    },
-    twig: {
-        exts: ['twig'],
-    },
-    typescript: {
-        exts: ['ts'],
-    },
-    vbnet: {
-        exts: ['vb'],
-    },
-    velocity: {
-        exts: ['vtl'],
-    },
-    verilog: {
-        exts: ['v'],
-    },
-    vhdl: {
-        exts: ['vhd', 'vhdl'],
-    },
-    vim: {
-        exts: [],
-    },
-    'visual-basic': {
-        exts: ['vb'],
-    },
-    wasm: {
-        exts: [],
-    },
-    url: {
-        exts: [],
-    },
-    wiki: {
-        exts: [],
-    },
-    xeora: {
-        exts: [],
-    },
-    xojo: {
-        exts: [],
-    },
-    xquery: {
-        exts: ['xy', 'xquery'],
-    },
-    yaml: {
-        exts: ['yaml', 'yml'],
-    },
-};
-function getSupportedFormats() {
-    return Object.keys(exports.FORMATS).filter((name) => name !== 'important' && name !== 'url');
-}
-exports.getSupportedFormats = getSupportedFormats;
-function getFormatByFile(path, formatsExts) {
-    const ext = path_1.extname(path).slice(1);
-    if (formatsExts && Object.keys(formatsExts).length) {
-        return Object.keys(formatsExts).find((format) => formatsExts[format].includes(ext));
-    }
-    return Object.keys(exports.FORMATS).find((language) => exports.FORMATS[language].exts.includes(ext));
-}
-exports.getFormatByFile = getFormatByFile;
-//# sourceMappingURL=formats.js.map
-
-/***/ }),
-
-/***/ 53524:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const reprism = __nccwpck_require__(18042);
-const abap = __nccwpck_require__(65444);
-const actionscript = __nccwpck_require__(21019);
-const ada = __nccwpck_require__(99040);
-const apacheconf = __nccwpck_require__(70629);
-const apl = __nccwpck_require__(13529);
-const applescript = __nccwpck_require__(95394);
-const arff = __nccwpck_require__(56245);
-const asciidoc = __nccwpck_require__(86002);
-const asm6502 = __nccwpck_require__(68737);
-const aspnet = __nccwpck_require__(16326);
-const autohotkey = __nccwpck_require__(3183);
-const autoit = __nccwpck_require__(41502);
-const bash = __nccwpck_require__(15209);
-const basic = __nccwpck_require__(46676);
-const batch = __nccwpck_require__(20986);
-const brainfuck = __nccwpck_require__(64636);
-const bro = __nccwpck_require__(57206);
-const c = __nccwpck_require__(98220);
-const clike = __nccwpck_require__(17403);
-const clojure = __nccwpck_require__(45685);
-const coffeescript = __nccwpck_require__(20525);
-const cpp = __nccwpck_require__(26433);
-const csharp = __nccwpck_require__(3204);
-const csp = __nccwpck_require__(12115);
-const cssExtras = __nccwpck_require__(16590);
-const css = __nccwpck_require__(58302);
-const d = __nccwpck_require__(60310);
-const dart = __nccwpck_require__(14572);
-const diff = __nccwpck_require__(35844);
-const django = __nccwpck_require__(97535);
-const docker = __nccwpck_require__(94508);
-const eiffel = __nccwpck_require__(79209);
-const elixir = __nccwpck_require__(74952);
-const erlang = __nccwpck_require__(15691);
-const flow = __nccwpck_require__(53794);
-const fortran = __nccwpck_require__(90374);
-const fsharp = __nccwpck_require__(63354);
-const gedcom = __nccwpck_require__(25605);
-const gherkin = __nccwpck_require__(14194);
-const git = __nccwpck_require__(96602);
-const glsl = __nccwpck_require__(96860);
-const go = __nccwpck_require__(96509);
-const graphql = __nccwpck_require__(6219);
-const groovy = __nccwpck_require__(90897);
-const haml = __nccwpck_require__(33412);
-const handlebars = __nccwpck_require__(62023);
-const haskell = __nccwpck_require__(2524);
-const haxe = __nccwpck_require__(7267);
-const hpkp = __nccwpck_require__(358);
-const hsts = __nccwpck_require__(42669);
-const http = __nccwpck_require__(7378);
-const ichigojam = __nccwpck_require__(79406);
-const icon = __nccwpck_require__(87849);
-const inform7 = __nccwpck_require__(63411);
-const ini = __nccwpck_require__(49597);
-const io = __nccwpck_require__(28985);
-const j = __nccwpck_require__(83738);
-const java = __nccwpck_require__(47998);
-const javascript = __nccwpck_require__(48430);
-const jolie = __nccwpck_require__(37234);
-const json = __nccwpck_require__(96317);
-const jsx = __nccwpck_require__(16054);
-const julia = __nccwpck_require__(18521);
-const keyman = __nccwpck_require__(1453);
-const kotlin = __nccwpck_require__(69707);
-const latex = __nccwpck_require__(78387);
-const less = __nccwpck_require__(25526);
-const liquid = __nccwpck_require__(110);
-const lisp = __nccwpck_require__(5716);
-const livescript = __nccwpck_require__(4273);
-const lolcode = __nccwpck_require__(78908);
-const lua = __nccwpck_require__(28482);
-const makefile = __nccwpck_require__(65822);
-const markdown = __nccwpck_require__(20518);
-const markupTemplating = __nccwpck_require__(8914);
-const markup = __nccwpck_require__(42152);
-const matlab = __nccwpck_require__(21372);
-const mel = __nccwpck_require__(19177);
-const mizar = __nccwpck_require__(37457);
-const monkey = __nccwpck_require__(26314);
-const n4js = __nccwpck_require__(41630);
-const nasm = __nccwpck_require__(57062);
-const nginx = __nccwpck_require__(44909);
-const nim = __nccwpck_require__(64441);
-const nix = __nccwpck_require__(51758);
-const nsis = __nccwpck_require__(47159);
-const objectivec = __nccwpck_require__(41466);
-const ocaml = __nccwpck_require__(20505);
-const opencl = __nccwpck_require__(24484);
-const oz = __nccwpck_require__(70834);
-const parigp = __nccwpck_require__(29775);
-const parser = __nccwpck_require__(28480);
-const pascal = __nccwpck_require__(98305);
-const perl = __nccwpck_require__(46306);
-const phpExtras = __nccwpck_require__(78800);
-const php = __nccwpck_require__(92619);
-const powershell = __nccwpck_require__(31896);
-const processing = __nccwpck_require__(63028);
-const prolog = __nccwpck_require__(11831);
-const properties = __nccwpck_require__(6971);
-const protobuf = __nccwpck_require__(9802);
-const pug = __nccwpck_require__(47602);
-const puppet = __nccwpck_require__(16015);
-const pure = __nccwpck_require__(96047);
-const python = __nccwpck_require__(42212);
-const q = __nccwpck_require__(70061);
-const qore = __nccwpck_require__(97631);
-const r = __nccwpck_require__(20420);
-const reason = __nccwpck_require__(39443);
-const renpy = __nccwpck_require__(48755);
-const rest = __nccwpck_require__(57652);
-const rip = __nccwpck_require__(11090);
-const roboconf = __nccwpck_require__(72149);
-const ruby = __nccwpck_require__(40415);
-const rust = __nccwpck_require__(93399);
-const sas = __nccwpck_require__(96939);
-const sass = __nccwpck_require__(37650);
-const scala = __nccwpck_require__(60988);
-const scheme = __nccwpck_require__(14150);
-const scss = __nccwpck_require__(56838);
-const smalltalk = __nccwpck_require__(81200);
-const smarty = __nccwpck_require__(94171);
-const soy = __nccwpck_require__(89135);
-const stylus = __nccwpck_require__(94920);
-const swift = __nccwpck_require__(58479);
-const tcl = __nccwpck_require__(59758);
-const textile = __nccwpck_require__(38347);
-const tsx = __nccwpck_require__(13220);
-const twig = __nccwpck_require__(99323);
-const typescript = __nccwpck_require__(148);
-const vbnet = __nccwpck_require__(15305);
-const velocity = __nccwpck_require__(16657);
-const verilog = __nccwpck_require__(26734);
-const vhdl = __nccwpck_require__(19450);
-const vim = __nccwpck_require__(38565);
-const visualBasic = __nccwpck_require__(58229);
-const wasm = __nccwpck_require__(63735);
-const wiki = __nccwpck_require__(9213);
-const xeora = __nccwpck_require__(93867);
-const xojo = __nccwpck_require__(81975);
-const yaml = __nccwpck_require__(54163);
-const tap = __nccwpck_require__(33636);
-const sql = __nccwpck_require__(19325);
-const plsql = __nccwpck_require__(23678);
-exports.languages = {
-    abap, actionscript, ada, apacheconf, apl, applescript, arff,
-    asciidoc, asm6502, aspnet, autohotkey, autoit, bash, basic, batch,
-    brainfuck, bro, c, clike, clojure, coffeescript, cpp, csharp, csp, cssExtras,
-    css, d, dart, diff, django, docker, eiffel, elixir, erlang, flow, fortran, fsharp,
-    gedcom, gherkin, git, glsl, go, graphql, groovy, haml, handlebars, haskell, haxe,
-    hpkp, hsts, http, ichigojam, icon, inform7, ini, io, j, java, javascript, jolie,
-    json, jsx, julia, keyman, kotlin, latex, less, liquid, lisp, livescript,
-    lolcode, lua, makefile, markdown, markupTemplating, markup, matlab, mel, mizar,
-    monkey, n4js, nasm, nginx, nim, nix, nsis, objectivec, ocaml, opencl, oz, parigp,
-    parser, pascal, perl, php, phpExtras, powershell, processing, prolog,
-    properties, protobuf, pug, puppet, pure, python, q, qore, r, reason, renpy, rest,
-    rip, roboconf, ruby, rust, sas, sass, scala, scheme, scss, smalltalk, smarty, soy,
-    stylus, swift, tcl, textile, twig, typescript, vbnet, velocity, verilog, vhdl,
-    vim, visualBasic, wasm, wiki, xeora, xojo, yaml, tsx, sql, plsql, tap
-};
-exports.loadLanguages = () => {
-    reprism.loadLanguages(Object.values(exports.languages).map(v => v.default));
-};
-//# sourceMappingURL=grammar-loader.js.map
-
-/***/ }),
-
-/***/ 43439:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const SparkMD5 = __nccwpck_require__(70220);
-function hash(value) {
-    return SparkMD5.hash(value);
-}
-exports.hash = hash;
-//# sourceMappingURL=hash.js.map
-
-/***/ }),
-
-/***/ 92080:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-function __export(m) {
-    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
-}
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const tokenize_1 = __nccwpck_require__(74749);
-__export(__nccwpck_require__(74749));
-__export(__nccwpck_require__(78199));
-__export(__nccwpck_require__(85049));
-class Tokenizer {
-    generateMaps(id, data, format, options) {
-        return tokenize_1.createTokenMapBasedOnCode(id, data, format, options);
-    }
-}
-exports.Tokenizer = Tokenizer;
-//# sourceMappingURL=index.js.map
-
-/***/ }),
-
-/***/ 23678:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const grammar = {
-    language: 'plsql',
-    init(Prism) {
-        Prism.languages.plsql = Prism.languages.extend('sql', {
-            comment: [/\/\*[\s\S]*?\*\//, /--.*/],
-        });
-        if (Prism.util.type(Prism.languages.plsql.keyword) !== 'Array') {
-            Prism.languages.plsql.keyword = [Prism.languages.plsql.keyword];
-        }
-        Prism.languages.plsql.keyword.unshift(/\b(?:ACCESS|AGENT|AGGREGATE|ARRAY|ARROW|AT|ATTRIBUTE|AUDIT|AUTHID|BFILE_BASE|BLOB_BASE|BLOCK|BODY|BOTH|BOUND|BYTE|CALLING|CHAR_BASE|CHARSET(?:FORM|ID)|CLOB_BASE|COLAUTH|COLLECT|CLUSTERS?|COMPILED|COMPRESS|CONSTANT|CONSTRUCTOR|CONTEXT|CRASH|CUSTOMDATUM|DANGLING|DATE_BASE|DEFINE|DETERMINISTIC|DURATION|ELEMENT|EMPTY|EXCEPTIONS?|EXCLUSIVE|EXTERNAL|FINAL|FORALL|FORM|FOUND|GENERAL|HEAP|HIDDEN|IDENTIFIED|IMMEDIATE|INCLUDING|INCREMENT|INDICATOR|INDEXES|INDICES|INFINITE|INITIAL|ISOPEN|INSTANTIABLE|INTERFACE|INVALIDATE|JAVA|LARGE|LEADING|LENGTH|LIBRARY|LIKE[24C]|LIMITED|LONG|LOOP|MAP|MAXEXTENTS|MAXLEN|MEMBER|MINUS|MLSLABEL|MULTISET|NAME|NAN|NATIVE|NEW|NOAUDIT|NOCOMPRESS|NOCOPY|NOTFOUND|NOWAIT|NUMBER(?:_BASE)?|OBJECT|OCI(?:COLL|DATE|DATETIME|DURATION|INTERVAL|LOBLOCATOR|NUMBER|RAW|REF|REFCURSOR|ROWID|STRING|TYPE)|OFFLINE|ONLINE|ONLY|OPAQUE|OPERATOR|ORACLE|ORADATA|ORGANIZATION|ORL(?:ANY|VARY)|OTHERS|OVERLAPS|OVERRIDING|PACKAGE|PARALLEL_ENABLE|PARAMETERS?|PASCAL|PCTFREE|PIPE(?:LINED)?|PRAGMA|PRIOR|PRIVATE|RAISE|RANGE|RAW|RECORD|REF|REFERENCE|REM|REMAINDER|RESULT|RESOURCE|RETURNING|REVERSE|ROW(?:ID|NUM|TYPE)|SAMPLE|SB[124]|SEGMENT|SELF|SEPARATE|SEQUENCE|SHORT|SIZE(?:_T)?|SPARSE|SQL(?:CODE|DATA|NAME|STATE)|STANDARD|STATIC|STDDEV|STORED|STRING|STRUCT|STYLE|SUBMULTISET|SUBPARTITION|SUBSTITUTABLE|SUBTYPE|SUCCESSFUL|SYNONYM|SYSDATE|TABAUTH|TDO|THE|TIMEZONE_(?:ABBR|HOUR|MINUTE|REGION)|TRAILING|TRANSAC(?:TIONAL)?|TRUSTED|UB[124]|UID|UNDER|UNTRUSTED|VALIDATE|VALIST|VARCHAR2|VARIABLE|VARIANCE|VARRAY|VIEWS|VOID|WHENEVER|WRAPPED|ZONE)\b/i);
-        if (Prism.util.type(Prism.languages.plsql.operator) !== 'Array') {
-            Prism.languages.plsql.operator = [Prism.languages.plsql.operator];
-        }
-        Prism.languages.plsql.operator.unshift(/:=/);
-    },
-};
-exports.default = grammar;
-//# sourceMappingURL=plsql.js.map
-
-/***/ }),
-
-/***/ 19325:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const grammar = {
-    language: 'sql',
-    init(Prism) {
-        Prism.languages.sql = {
-            'comment': {
-                pattern: /(^|[^\\])(?:\/\*[\s\S]*?\*\/|(?:--|\/\/|#).*)/,
-                lookbehind: true,
-            },
-            'variable': [
-                {
-                    pattern: /@(["'`])(?:\\[\s\S]|(?!\1)[^\\])+\1/,
-                    greedy: true,
-                },
-                /@[\w.$]+/,
-            ],
-            'string': {
-                pattern: /(^|[^@\\])("|')(?:\\[\s\S]|(?!\2)[^\\]|\2\2)*\2/,
-                greedy: true,
-                lookbehind: true,
-            },
-            'function': /\b(?:AVG|COUNT|FIRST|FORMAT|LAST|LCASE|LEN|MAX|MID|MIN|MOD|NOW|ROUND|SUM|UCASE)(?=\s*\()/i,
-            'keyword': /\b(?:ACTION|ADD|AFTER|ALGORITHM|ALL|ALTER|ANALYZE|ANY|APPLY|AS|ASC|AUTHORIZATION|AUTO_INCREMENT|BACKUP|BDB|BEGIN|BERKELEYDB|BIGINT|BINARY|BIT|BLOB|BOOL|BOOLEAN|BREAK|BROWSE|BTREE|BULK|BY|CALL|CASCADED?|CASE|CHAIN|CHAR(?:ACTER|SET)?|CHECK(?:POINT)?|CLOSE|CLUSTERED|COALESCE|COLLATE|COLUMNS?|COMMENT|COMMIT(?:TED)?|COMPUTE|CONNECT|CONSISTENT|CONSTRAINT|CONTAINS(?:TABLE)?|CONTINUE|CONVERT|CREATE|CROSS|CURRENT(?:_DATE|_TIME|_TIMESTAMP|_USER)?|CURSOR|CYCLE|DATA(?:BASES?)?|DATE(?:TIME)?|DAY|DBCC|DEALLOCATE|DEC|DECIMAL|DECLARE|DEFAULT|DEFINER|DELAYED|DELETE|DELIMITERS?|DENY|DESC|DESCRIBE|DETERMINISTIC|DISABLE|DISCARD|DISK|DISTINCT|DISTINCTROW|DISTRIBUTED|DO|DOUBLE|DROP|DUMMY|DUMP(?:FILE)?|DUPLICATE|ELSE(?:IF)?|ENABLE|ENCLOSED|END|ENGINE|ENUM|ERRLVL|ERRORS|ESCAPED?|EXCEPT|EXEC(?:UTE)?|EXISTS|EXIT|EXPLAIN|EXTENDED|FETCH|FIELDS|FILE|FILLFACTOR|FIRST|FIXED|FLOAT|FOLLOWING|FOR(?: EACH ROW)?|FORCE|FOREIGN|FREETEXT(?:TABLE)?|FROM|FULL|FUNCTION|GEOMETRY(?:COLLECTION)?|GLOBAL|GOTO|GRANT|GROUP|HANDLER|HASH|HAVING|HOLDLOCK|HOUR|IDENTITY(?:_INSERT|COL)?|IF|IGNORE|IMPORT|INDEX|INFILE|INNER|INNODB|INOUT|INSERT|INT|INTEGER|INTERSECT|INTERVAL|INTO|INVOKER|ISOLATION|ITERATE|JOIN|KEYS?|KILL|LANGUAGE|LAST|LEAVE|LEFT|LEVEL|LIMIT|LINENO|LINES|LINESTRING|LOAD|LOCAL|LOCK|LONG(?:BLOB|TEXT)|LOOP|MATCH(?:ED)?|MEDIUM(?:BLOB|INT|TEXT)|MERGE|MIDDLEINT|MINUTE|MODE|MODIFIES|MODIFY|MONTH|MULTI(?:LINESTRING|POINT|POLYGON)|NATIONAL|NATURAL|NCHAR|NEXT|NO|NONCLUSTERED|NULLIF|NUMERIC|OFF?|OFFSETS?|ON|OPEN(?:DATASOURCE|QUERY|ROWSET)?|OPTIMIZE|OPTION(?:ALLY)?|ORDER|OUT(?:ER|FILE)?|OVER|PARTIAL|PARTITION|PERCENT|PIVOT|PLAN|POINT|POLYGON|PRECEDING|PRECISION|PREPARE|PREV|PRIMARY|PRINT|PRIVILEGES|PROC(?:EDURE)?|PUBLIC|PURGE|QUICK|RAISERROR|READS?|REAL|RECONFIGURE|REFERENCES|RELEASE|RENAME|REPEAT(?:ABLE)?|REPLACE|REPLICATION|REQUIRE|RESIGNAL|RESTORE|RESTRICT|RETURNS?|REVOKE|RIGHT|ROLLBACK|ROUTINE|ROW(?:COUNT|GUIDCOL|S)?|RTREE|RULE|SAVE(?:POINT)?|SCHEMA|SECOND|SELECT|SERIAL(?:IZABLE)?|SESSION(?:_USER)?|SET(?:USER)?|SHARE|SHOW|SHUTDOWN|SIMPLE|SMALLINT|SNAPSHOT|SOME|SONAME|SQL|START(?:ING)?|STATISTICS|STATUS|STRIPED|SYSTEM_USER|TABLES?|TABLESPACE|TEMP(?:ORARY|TABLE)?|TERMINATED|TEXT(?:SIZE)?|THEN|TIME(?:STAMP)?|TINY(?:BLOB|INT|TEXT)|TOP?|TRAN(?:SACTIONS?)?|TRIGGER|TRUNCATE|TSEQUAL|TYPES?|UNBOUNDED|UNCOMMITTED|UNDEFINED|UNION|UNIQUE|UNLOCK|UNPIVOT|UNSIGNED|UPDATE(?:TEXT)?|USAGE|USE|USER|USING|VALUES?|VAR(?:BINARY|CHAR|CHARACTER|YING)|VIEW|WAITFOR|WARNINGS|WHEN|WHERE|WHILE|WITH(?: ROLLUP|IN)?|WORK|WRITE(?:TEXT)?|YEAR)\b/i,
-            'boolean': /\b(?:TRUE|FALSE|NULL)\b/i,
-            'number': /\b0x[\da-f]+\b|\b\d+\.?\d*|\B\.\d+\b/i,
-            'operator': /[-+*\/=%^~]|&&?|\|\|?|!=?|<(?:=>?|<|>)?|>[>=]?|\b(?:AND|BETWEEN|IN|LIKE|NOT|OR|IS|DIV|REGEXP|RLIKE|SOUNDS LIKE|XOR)\b/i,
-            'punctuation': /[;[\]()`,.]/,
-        };
-    },
-};
-exports.default = grammar;
-//# sourceMappingURL=sql.js.map
-
-/***/ }),
-
-/***/ 33636:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const grammar = {
-    language: 'tap',
-    init(Prism) {
-        Prism.languages.tap = {
-            fail: /not ok[^#{\n\r]*/,
-            pass: /ok[^#{\n\r]*/,
-            pragma: /pragma [+-][a-z]+/,
-            bailout: /bail out!.*/i,
-            version: /TAP version \d+/i,
-            plan: /\d+\.\.\d+(?: +#.*)?/,
-            subtest: {
-                pattern: /# Subtest(?:: .*)?/,
-                greedy: true
-            },
-            punctuation: /[{}]/,
-            directive: /#.*/,
-            yamlish: {
-                pattern: /(^[ \t]*)---[\s\S]*?[\r\n][ \t]*\.\.\.$/m,
-                lookbehind: true,
-                inside: Prism.languages.yaml,
-                alias: 'language-yaml'
-            }
-        };
-    },
-};
-exports.default = grammar;
-//# sourceMappingURL=tap.js.map
-
-/***/ }),
-
-/***/ 78199:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const hash_1 = __nccwpck_require__(43439);
-const TOKEN_HASH_LENGTH = 20;
-function createTokenHash(token, hashFunction = undefined) {
-    return hashFunction ?
-        hashFunction(token.type + token.value).substr(0, TOKEN_HASH_LENGTH) :
-        hash_1.hash(token.type + token.value).substr(0, TOKEN_HASH_LENGTH);
-}
-function groupByFormat(tokens) {
-    const result = {};
-    // TODO change to reduce
-    tokens.forEach((token) => {
-        (result[token.format] = result[token.format] ? [...result[token.format], token] : [token]);
-    });
-    return result;
-}
-class TokensMap {
-    constructor(id, data, tokens, format, options) {
-        this.id = id;
-        this.data = data;
-        this.tokens = tokens;
-        this.format = format;
-        this.options = options;
-        this.position = 0;
-        this.hashMap = this.tokens.map((token) => {
-            if (options.ignoreCase) {
-                token.value = token.value.toLocaleLowerCase();
-            }
-            return createTokenHash(token, this.options.hashFunction);
-        }).join('');
-    }
-    getTokensCount() {
-        return this.tokens[this.tokens.length - 1].loc.end.position - this.tokens[0].loc.start.position;
-    }
-    getId() {
-        return this.id;
-    }
-    getLinesCount() {
-        return this.tokens[this.tokens.length - 1].loc.end.line - this.tokens[0].loc.start.line;
-    }
-    getFormat() {
-        return this.format;
-    }
-    [Symbol.iterator]() {
-        return this;
-    }
-    next() {
-        const hashFunction = this.options.hashFunction ? this.options.hashFunction : hash_1.hash;
-        const mapFrame = hashFunction(this.hashMap.substring(this.position * TOKEN_HASH_LENGTH, this.position * TOKEN_HASH_LENGTH + this.options.minTokens * TOKEN_HASH_LENGTH)).substring(0, TOKEN_HASH_LENGTH);
-        if (this.position < this.tokens.length - this.options.minTokens) {
-            this.position++;
-            return {
-                done: false,
-                value: {
-                    id: mapFrame,
-                    sourceId: this.getId(),
-                    start: this.tokens[this.position - 1],
-                    end: this.tokens[this.position + this.options.minTokens - 1],
-                },
-            };
-        }
-        else {
-            return {
-                done: true,
-                value: false,
-            };
-        }
-    }
-}
-exports.TokensMap = TokensMap;
-function generateMapsForFormats(id, data, tokens, options) {
-    return Object
-        .values(groupByFormat(tokens))
-        .map((formatTokens) => new TokensMap(id, data, formatTokens, formatTokens[0].format, options));
-}
-exports.generateMapsForFormats = generateMapsForFormats;
-function createTokensMaps(id, data, tokens, options) {
-    return generateMapsForFormats(id, data, tokens, options);
-}
-exports.createTokensMaps = createTokensMaps;
-//# sourceMappingURL=token-map.js.map
-
-/***/ }),
-
-/***/ 74749:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const reprism = __nccwpck_require__(18042);
-const formats_1 = __nccwpck_require__(85049);
-const token_map_1 = __nccwpck_require__(78199);
-const grammar_loader_1 = __nccwpck_require__(53524);
-const ignore = {
-    ignore: [
-        {
-            pattern: /(jscpd:ignore-start)[\s\S]*?(?=jscpd:ignore-end)/,
-            lookbehind: true,
-            greedy: true,
-        },
-        {
-            pattern: /jscpd:ignore-start/,
-            greedy: false,
-        },
-        {
-            pattern: /jscpd:ignore-end/,
-            greedy: false,
-        },
-    ],
-};
-const punctuation = {
-    // eslint-disable-next-line @typescript-eslint/camelcase
-    new_line: /\n/,
-    empty: /\s+/,
-};
-const initializeFormats = () => {
-    grammar_loader_1.loadLanguages();
-    Object
-        .keys(reprism.default.languages)
-        .forEach((lang) => {
-        if (lang !== 'extend' && lang !== 'insertBefore' && lang !== 'DFS') {
-            reprism.default.languages[lang] = Object.assign(Object.assign(Object.assign({}, ignore), reprism.default.languages[lang]), punctuation);
-        }
-    });
-};
-initializeFormats();
-function getLanguagePrismName(lang) {
-    if (lang in formats_1.FORMATS && formats_1.FORMATS[lang].parent) {
-        return formats_1.FORMATS[lang].parent;
-    }
-    return lang;
-}
-function tokenize(code, language) {
-    let length = 0;
-    let line = 1;
-    let column = 1;
-    function sanitizeLangName(name) {
-        return name && name.replace ? name.replace('language-', '') : 'unknown';
-    }
-    function createTokenFromString(token, lang) {
-        return [
-            {
-                format: lang,
-                type: 'default',
-                value: token,
-                length: token.length,
-            },
-        ];
-    }
-    function calculateLocation(token, position) {
-        const result = token;
-        const lines = typeof result.value === 'string' && result.value.split ? result.value.split('\n') : [];
-        const newLines = lines.length - 1;
-        const start = {
-            line,
-            column,
-            position
-        };
-        column = newLines >= 0 ? lines[lines.length - 1].length + 1 : column;
-        const end = {
-            line: line + newLines,
-            column,
-            position
-        };
-        result.loc = { start, end };
-        result.range = [length, length + result.length];
-        length += result.length;
-        line += newLines;
-        return result;
-    }
-    function createTokenFromFlatToken(token, lang) {
-        return [
-            {
-                format: lang,
-                type: token.type,
-                value: token.content,
-                length: token.length,
-            },
-        ];
-    }
-    function createTokens(token, lang) {
-        if (token.content && typeof token.content === 'string') {
-            return createTokenFromFlatToken(token, lang);
-        }
-        if (token.content && Array.isArray(token.content)) {
-            let res = [];
-            token.content.forEach((t) => (res = res.concat(createTokens(t, token.alias ? sanitizeLangName(token.alias) : lang))));
-            return res;
-        }
-        return createTokenFromString(token, lang);
-    }
-    let tokens = [];
-    const grammar = reprism.default.languages[getLanguagePrismName(language)];
-    if (!reprism.default.languages[getLanguagePrismName(language)]) {
-        console.warn('Warn: jscpd has issue with support of "' + getLanguagePrismName(language) + '"');
-        return [];
-    }
-    reprism.default.tokenize(code, grammar)
-        .forEach((t) => (tokens = tokens.concat(createTokens(t, language))));
-    return tokens
-        .filter((t) => t.format in formats_1.FORMATS)
-        .map((token, index) => calculateLocation(token, index));
-}
-exports.tokenize = tokenize;
-function createTokenMapBasedOnCode(id, data, format, options = {}) {
-    const { mode, ignoreCase } = options;
-    const tokens = tokenize(data, format)
-        .filter((token) => mode(token, options));
-    if (ignoreCase) {
-        return token_map_1.createTokensMaps(id, data, tokens.map((token) => {
-            token.value = token.value.toLocaleLowerCase();
-            return token;
-        }), options);
-    }
-    return token_map_1.createTokensMaps(id, data, tokens, options);
-}
-exports.createTokenMapBasedOnCode = createTokenMapBasedOnCode;
-//# sourceMappingURL=tokenize.js.map
-
-/***/ }),
-
 /***/ 63803:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
@@ -3864,7 +1497,7 @@ exports.createTokenMapBasedOnCode = createTokenMapBasedOnCode;
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.createFileSystemAdapter = exports.FILE_SYSTEM_ADAPTER = void 0;
-const fs = __nccwpck_require__(35747);
+const fs = __nccwpck_require__(57147);
 exports.FILE_SYSTEM_ADAPTER = {
     lstat: fs.lstat,
     stat: fs.stat,
@@ -4144,7 +1777,7 @@ exports.readdir = readdir;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-const path = __nccwpck_require__(85622);
+const path = __nccwpck_require__(71017);
 const fsStat = __nccwpck_require__(70109);
 const fs = __nccwpck_require__(63803);
 class Settings {
@@ -4165,7 +1798,7 @@ class Settings {
         return option !== null && option !== void 0 ? option : value;
     }
 }
-exports.default = Settings;
+exports["default"] = Settings;
 
 
 /***/ }),
@@ -4217,7 +1850,7 @@ exports.fs = fs;
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.createFileSystemAdapter = exports.FILE_SYSTEM_ADAPTER = void 0;
-const fs = __nccwpck_require__(35747);
+const fs = __nccwpck_require__(57147);
 exports.FILE_SYSTEM_ADAPTER = {
     lstat: fs.lstat,
     stat: fs.stat,
@@ -4363,7 +1996,7 @@ class Settings {
         return option !== null && option !== void 0 ? option : value;
     }
 }
-exports.default = Settings;
+exports["default"] = Settings;
 
 
 /***/ }),
@@ -4437,7 +2070,7 @@ class AsyncProvider {
         this._reader.read();
     }
 }
-exports.default = AsyncProvider;
+exports["default"] = AsyncProvider;
 function callFailureCallback(callback, error) {
     callback(error);
 }
@@ -4454,7 +2087,7 @@ function callSuccessCallback(callback, entries) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-const stream_1 = __nccwpck_require__(92413);
+const stream_1 = __nccwpck_require__(12781);
 const async_1 = __nccwpck_require__(55732);
 class StreamProvider {
     constructor(_root, _settings) {
@@ -4485,7 +2118,7 @@ class StreamProvider {
         return this._stream;
     }
 }
-exports.default = StreamProvider;
+exports["default"] = StreamProvider;
 
 
 /***/ }),
@@ -4507,7 +2140,7 @@ class SyncProvider {
         return this._reader.read();
     }
 }
-exports.default = SyncProvider;
+exports["default"] = SyncProvider;
 
 
 /***/ }),
@@ -4518,7 +2151,7 @@ exports.default = SyncProvider;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-const events_1 = __nccwpck_require__(28614);
+const events_1 = __nccwpck_require__(82361);
 const fsScandir = __nccwpck_require__(75667);
 const fastq = __nccwpck_require__(7340);
 const common = __nccwpck_require__(97988);
@@ -4612,7 +2245,7 @@ class AsyncReader extends reader_1.default {
         this._emitter.emit('entry', entry);
     }
 }
-exports.default = AsyncReader;
+exports["default"] = AsyncReader;
 
 
 /***/ }),
@@ -4670,7 +2303,7 @@ class Reader {
         this._root = common.replacePathSegmentSeparator(_root, _settings.pathSegmentSeparator);
     }
 }
-exports.default = Reader;
+exports["default"] = Reader;
 
 
 /***/ }),
@@ -4737,7 +2370,7 @@ class SyncReader extends reader_1.default {
         this._storage.push(entry);
     }
 }
-exports.default = SyncReader;
+exports["default"] = SyncReader;
 
 
 /***/ }),
@@ -4748,7 +2381,7 @@ exports.default = SyncReader;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-const path = __nccwpck_require__(85622);
+const path = __nccwpck_require__(71017);
 const fsScandir = __nccwpck_require__(75667);
 class Settings {
     constructor(_options = {}) {
@@ -4771,7 +2404,7 @@ class Settings {
         return option !== null && option !== void 0 ? option : value;
     }
 }
-exports.default = Settings;
+exports["default"] = Settings;
 
 
 /***/ }),
@@ -7313,7 +4946,7 @@ exports.request = request;
 
 module.exports = ({onlyFirst = false} = {}) => {
 	const pattern = [
-		'[\\u001B\\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]*)*)?\\u0007)',
+		'[\\u001B\\u009B][[\\]()#;?]*(?:(?:(?:(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]+)*|[a-zA-Z\\d]+(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]*)*)?\\u0007)',
 		'(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PR-TZcf-ntqry=><~]))'
 	].join('|');
 
@@ -7352,15 +4985,17 @@ var utils = __nccwpck_require__(20328);
 var settle = __nccwpck_require__(13211);
 var buildFullPath = __nccwpck_require__(41934);
 var buildURL = __nccwpck_require__(30646);
-var http = __nccwpck_require__(15876);
-var https = __nccwpck_require__(57211);
-var httpFollow = __nccwpck_require__(67707).http;
-var httpsFollow = __nccwpck_require__(67707).https;
-var url = __nccwpck_require__(78835);
-var zlib = __nccwpck_require__(78761);
-var pkg = __nccwpck_require__(20696);
+var http = __nccwpck_require__(13685);
+var https = __nccwpck_require__(95687);
+var httpFollow = (__nccwpck_require__(67707).http);
+var httpsFollow = (__nccwpck_require__(67707).https);
+var url = __nccwpck_require__(57310);
+var zlib = __nccwpck_require__(59796);
+var VERSION = (__nccwpck_require__(94322).version);
 var createError = __nccwpck_require__(15226);
 var enhanceError = __nccwpck_require__(21516);
+var defaults = __nccwpck_require__(98190);
+var Cancel = __nccwpck_require__(98875);
 
 var isHttps = /https:?/;
 
@@ -7392,20 +5027,43 @@ function setProxy(options, proxy, location) {
 /*eslint consistent-return:0*/
 module.exports = function httpAdapter(config) {
   return new Promise(function dispatchHttpRequest(resolvePromise, rejectPromise) {
+    var onCanceled;
+    function done() {
+      if (config.cancelToken) {
+        config.cancelToken.unsubscribe(onCanceled);
+      }
+
+      if (config.signal) {
+        config.signal.removeEventListener('abort', onCanceled);
+      }
+    }
     var resolve = function resolve(value) {
+      done();
       resolvePromise(value);
     };
     var reject = function reject(value) {
+      done();
       rejectPromise(value);
     };
     var data = config.data;
     var headers = config.headers;
+    var headerNames = {};
+
+    Object.keys(headers).forEach(function storeLowerName(name) {
+      headerNames[name.toLowerCase()] = name;
+    });
 
     // Set User-Agent (required by some servers)
-    // Only set header if it hasn't been set in config
     // See https://github.com/axios/axios/issues/69
-    if (!headers['User-Agent'] && !headers['user-agent']) {
-      headers['User-Agent'] = 'axios/' + pkg.version;
+    if ('user-agent' in headerNames) {
+      // User-Agent is specified; handle case where no UA header is desired
+      if (!headers[headerNames['user-agent']]) {
+        delete headers[headerNames['user-agent']];
+      }
+      // Otherwise, use specified value
+    } else {
+      // Only set header if it hasn't been set in config
+      headers['User-Agent'] = 'axios/' + VERSION;
     }
 
     if (data && !utils.isStream(data)) {
@@ -7423,7 +5081,9 @@ module.exports = function httpAdapter(config) {
       }
 
       // Add Content-Length header if data exists
-      headers['Content-Length'] = data.length;
+      if (!headerNames['content-length']) {
+        headers['Content-Length'] = data.length;
+      }
     }
 
     // HTTP basic authentication
@@ -7446,8 +5106,8 @@ module.exports = function httpAdapter(config) {
       auth = urlUsername + ':' + urlPassword;
     }
 
-    if (auth) {
-      delete headers.Authorization;
+    if (auth && headerNames.authorization) {
+      delete headers[headerNames.authorization];
     }
 
     var isHttpsRequest = isHttps.test(protocol);
@@ -7539,6 +5199,10 @@ module.exports = function httpAdapter(config) {
       options.maxBodyLength = config.maxBodyLength;
     }
 
+    if (config.insecureHTTPParser) {
+      options.insecureHTTPParser = config.insecureHTTPParser;
+    }
+
     // Create the request
     var req = transport.request(options, function handleResponse(res) {
       if (req.aborted) return;
@@ -7579,11 +5243,13 @@ module.exports = function httpAdapter(config) {
         settle(resolve, reject, response);
       } else {
         var responseBuffer = [];
+        var totalResponseBytes = 0;
         stream.on('data', function handleStreamData(chunk) {
           responseBuffer.push(chunk);
+          totalResponseBytes += chunk.length;
 
           // make sure the content length is not over the maxContentLength if specified
-          if (config.maxContentLength > -1 && Buffer.concat(responseBuffer).length > config.maxContentLength) {
+          if (config.maxContentLength > -1 && totalResponseBytes > config.maxContentLength) {
             stream.destroy();
             reject(createError('maxContentLength size of ' + config.maxContentLength + ' exceeded',
               config, null, lastRequest));
@@ -7618,26 +5284,53 @@ module.exports = function httpAdapter(config) {
 
     // Handle request timeout
     if (config.timeout) {
+      // This is forcing a int timeout to avoid problems if the `req` interface doesn't handle other types.
+      var timeout = parseInt(config.timeout, 10);
+
+      if (isNaN(timeout)) {
+        reject(createError(
+          'error trying to parse `config.timeout` to int',
+          config,
+          'ERR_PARSE_TIMEOUT',
+          req
+        ));
+
+        return;
+      }
+
       // Sometime, the response will be very slow, and does not respond, the connect event will be block by event loop system.
       // And timer callback will be fired, and abort() will be invoked before connection, then get "socket hang up" and code ECONNRESET.
       // At this time, if we have a large number of request, nodejs will hang up some socket on background. and the number will up and up.
       // And then these socket which be hang up will devoring CPU little by little.
       // ClientRequest.setTimeout will be fired on the specify milliseconds, and can make sure that abort() will be fired after connect.
-      req.setTimeout(config.timeout, function handleRequestTimeout() {
+      req.setTimeout(timeout, function handleRequestTimeout() {
         req.abort();
-        reject(createError('timeout of ' + config.timeout + 'ms exceeded', config, 'ECONNABORTED', req));
+        var transitional = config.transitional || defaults.transitional;
+        reject(createError(
+          'timeout of ' + timeout + 'ms exceeded',
+          config,
+          transitional.clarifyTimeoutError ? 'ETIMEDOUT' : 'ECONNABORTED',
+          req
+        ));
       });
     }
 
-    if (config.cancelToken) {
+    if (config.cancelToken || config.signal) {
       // Handle cancellation
-      config.cancelToken.promise.then(function onCanceled(cancel) {
+      // eslint-disable-next-line func-names
+      onCanceled = function(cancel) {
         if (req.aborted) return;
 
         req.abort();
-        reject(cancel);
-      });
+        reject(!cancel || (cancel && cancel.type) ? new Cancel('canceled') : cancel);
+      };
+
+      config.cancelToken && config.cancelToken.subscribe(onCanceled);
+      if (config.signal) {
+        config.signal.aborted ? onCanceled() : config.signal.addEventListener('abort', onCanceled);
+      }
     }
+
 
     // Send the request
     if (utils.isStream(data)) {
@@ -7667,11 +5360,24 @@ var buildFullPath = __nccwpck_require__(41934);
 var parseHeaders = __nccwpck_require__(86455);
 var isURLSameOrigin = __nccwpck_require__(33608);
 var createError = __nccwpck_require__(15226);
+var defaults = __nccwpck_require__(98190);
+var Cancel = __nccwpck_require__(98875);
 
 module.exports = function xhrAdapter(config) {
   return new Promise(function dispatchXhrRequest(resolve, reject) {
     var requestData = config.data;
     var requestHeaders = config.headers;
+    var responseType = config.responseType;
+    var onCanceled;
+    function done() {
+      if (config.cancelToken) {
+        config.cancelToken.unsubscribe(onCanceled);
+      }
+
+      if (config.signal) {
+        config.signal.removeEventListener('abort', onCanceled);
+      }
+    }
 
     if (utils.isFormData(requestData)) {
       delete requestHeaders['Content-Type']; // Let the browser set it
@@ -7692,23 +5398,14 @@ module.exports = function xhrAdapter(config) {
     // Set the request timeout in MS
     request.timeout = config.timeout;
 
-    // Listen for ready state
-    request.onreadystatechange = function handleLoad() {
-      if (!request || request.readyState !== 4) {
+    function onloadend() {
+      if (!request) {
         return;
       }
-
-      // The request errored out and we didn't get a response, this will be
-      // handled by onerror instead
-      // With one exception: request that using file: protocol, most browsers
-      // will return status as 0 even though it's a successful request
-      if (request.status === 0 && !(request.responseURL && request.responseURL.indexOf('file:') === 0)) {
-        return;
-      }
-
       // Prepare the response
       var responseHeaders = 'getAllResponseHeaders' in request ? parseHeaders(request.getAllResponseHeaders()) : null;
-      var responseData = !config.responseType || config.responseType === 'text' ? request.responseText : request.response;
+      var responseData = !responseType || responseType === 'text' ||  responseType === 'json' ?
+        request.responseText : request.response;
       var response = {
         data: responseData,
         status: request.status,
@@ -7718,11 +5415,40 @@ module.exports = function xhrAdapter(config) {
         request: request
       };
 
-      settle(resolve, reject, response);
+      settle(function _resolve(value) {
+        resolve(value);
+        done();
+      }, function _reject(err) {
+        reject(err);
+        done();
+      }, response);
 
       // Clean up request
       request = null;
-    };
+    }
+
+    if ('onloadend' in request) {
+      // Use onloadend if available
+      request.onloadend = onloadend;
+    } else {
+      // Listen for ready state to emulate onloadend
+      request.onreadystatechange = function handleLoad() {
+        if (!request || request.readyState !== 4) {
+          return;
+        }
+
+        // The request errored out and we didn't get a response, this will be
+        // handled by onerror instead
+        // With one exception: request that using file: protocol, most browsers
+        // will return status as 0 even though it's a successful request
+        if (request.status === 0 && !(request.responseURL && request.responseURL.indexOf('file:') === 0)) {
+          return;
+        }
+        // readystate handler is calling before onerror or ontimeout handlers,
+        // so we should call onloadend on the next 'tick'
+        setTimeout(onloadend);
+      };
+    }
 
     // Handle browser request cancellation (as opposed to a manual cancellation)
     request.onabort = function handleAbort() {
@@ -7748,11 +5474,15 @@ module.exports = function xhrAdapter(config) {
 
     // Handle timeout
     request.ontimeout = function handleTimeout() {
-      var timeoutErrorMessage = 'timeout of ' + config.timeout + 'ms exceeded';
+      var timeoutErrorMessage = config.timeout ? 'timeout of ' + config.timeout + 'ms exceeded' : 'timeout exceeded';
+      var transitional = config.transitional || defaults.transitional;
       if (config.timeoutErrorMessage) {
         timeoutErrorMessage = config.timeoutErrorMessage;
       }
-      reject(createError(timeoutErrorMessage, config, 'ECONNABORTED',
+      reject(createError(
+        timeoutErrorMessage,
+        config,
+        transitional.clarifyTimeoutError ? 'ETIMEDOUT' : 'ECONNABORTED',
         request));
 
       // Clean up request
@@ -7792,16 +5522,8 @@ module.exports = function xhrAdapter(config) {
     }
 
     // Add responseType to request if needed
-    if (config.responseType) {
-      try {
-        request.responseType = config.responseType;
-      } catch (e) {
-        // Expected DOMException thrown by browsers not compatible XMLHttpRequest Level 2.
-        // But, this can be suppressed for 'json' type as it can be parsed by default 'transformResponse' function.
-        if (config.responseType !== 'json') {
-          throw e;
-        }
-      }
+    if (responseType && responseType !== 'json') {
+      request.responseType = config.responseType;
     }
 
     // Handle progress if needed
@@ -7814,18 +5536,22 @@ module.exports = function xhrAdapter(config) {
       request.upload.addEventListener('progress', config.onUploadProgress);
     }
 
-    if (config.cancelToken) {
+    if (config.cancelToken || config.signal) {
       // Handle cancellation
-      config.cancelToken.promise.then(function onCanceled(cancel) {
+      // eslint-disable-next-line func-names
+      onCanceled = function(cancel) {
         if (!request) {
           return;
         }
-
+        reject(!cancel || (cancel && cancel.type) ? new Cancel('canceled') : cancel);
         request.abort();
-        reject(cancel);
-        // Clean up request
         request = null;
-      });
+      };
+
+      config.cancelToken && config.cancelToken.subscribe(onCanceled);
+      if (config.signal) {
+        config.signal.aborted ? onCanceled() : config.signal.addEventListener('abort', onCanceled);
+      }
     }
 
     if (!requestData) {
@@ -7868,6 +5594,11 @@ function createInstance(defaultConfig) {
   // Copy context to instance
   utils.extend(instance, context);
 
+  // Factory for creating new instances
+  instance.create = function create(instanceConfig) {
+    return createInstance(mergeConfig(defaultConfig, instanceConfig));
+  };
+
   return instance;
 }
 
@@ -7877,15 +5608,11 @@ var axios = createInstance(defaults);
 // Expose Axios class to allow class inheritance
 axios.Axios = Axios;
 
-// Factory for creating new instances
-axios.create = function create(instanceConfig) {
-  return createInstance(mergeConfig(axios.defaults, instanceConfig));
-};
-
 // Expose Cancel & CancelToken
 axios.Cancel = __nccwpck_require__(98875);
 axios.CancelToken = __nccwpck_require__(71587);
 axios.isCancel = __nccwpck_require__(64057);
+axios.VERSION = (__nccwpck_require__(94322).version);
 
 // Expose all/spread
 axios.all = function all(promises) {
@@ -7899,7 +5626,7 @@ axios.isAxiosError = __nccwpck_require__(60650);
 module.exports = axios;
 
 // Allow use of default import syntax in TypeScript
-module.exports.default = axios;
+module.exports["default"] = axios;
 
 
 /***/ }),
@@ -7951,11 +5678,42 @@ function CancelToken(executor) {
   }
 
   var resolvePromise;
+
   this.promise = new Promise(function promiseExecutor(resolve) {
     resolvePromise = resolve;
   });
 
   var token = this;
+
+  // eslint-disable-next-line func-names
+  this.promise.then(function(cancel) {
+    if (!token._listeners) return;
+
+    var i;
+    var l = token._listeners.length;
+
+    for (i = 0; i < l; i++) {
+      token._listeners[i](cancel);
+    }
+    token._listeners = null;
+  });
+
+  // eslint-disable-next-line func-names
+  this.promise.then = function(onfulfilled) {
+    var _resolve;
+    // eslint-disable-next-line func-names
+    var promise = new Promise(function(resolve) {
+      token.subscribe(resolve);
+      _resolve = resolve;
+    }).then(onfulfilled);
+
+    promise.cancel = function reject() {
+      token.unsubscribe(_resolve);
+    };
+
+    return promise;
+  };
+
   executor(function cancel(message) {
     if (token.reason) {
       // Cancellation has already been requested
@@ -7973,6 +5731,37 @@ function CancelToken(executor) {
 CancelToken.prototype.throwIfRequested = function throwIfRequested() {
   if (this.reason) {
     throw this.reason;
+  }
+};
+
+/**
+ * Subscribe to the cancel signal
+ */
+
+CancelToken.prototype.subscribe = function subscribe(listener) {
+  if (this.reason) {
+    listener(this.reason);
+    return;
+  }
+
+  if (this._listeners) {
+    this._listeners.push(listener);
+  } else {
+    this._listeners = [listener];
+  }
+};
+
+/**
+ * Unsubscribe from the cancel signal
+ */
+
+CancelToken.prototype.unsubscribe = function unsubscribe(listener) {
+  if (!this._listeners) {
+    return;
+  }
+  var index = this._listeners.indexOf(listener);
+  if (index !== -1) {
+    this._listeners.splice(index, 1);
   }
 };
 
@@ -8020,7 +5809,9 @@ var buildURL = __nccwpck_require__(30646);
 var InterceptorManager = __nccwpck_require__(3214);
 var dispatchRequest = __nccwpck_require__(85062);
 var mergeConfig = __nccwpck_require__(74831);
+var validator = __nccwpck_require__(51632);
 
+var validators = validator.validators;
 /**
  * Create a new instance of Axios
  *
@@ -8060,20 +5851,71 @@ Axios.prototype.request = function request(config) {
     config.method = 'get';
   }
 
-  // Hook up interceptors middleware
-  var chain = [dispatchRequest, undefined];
-  var promise = Promise.resolve(config);
+  var transitional = config.transitional;
 
+  if (transitional !== undefined) {
+    validator.assertOptions(transitional, {
+      silentJSONParsing: validators.transitional(validators.boolean),
+      forcedJSONParsing: validators.transitional(validators.boolean),
+      clarifyTimeoutError: validators.transitional(validators.boolean)
+    }, false);
+  }
+
+  // filter out skipped interceptors
+  var requestInterceptorChain = [];
+  var synchronousRequestInterceptors = true;
   this.interceptors.request.forEach(function unshiftRequestInterceptors(interceptor) {
-    chain.unshift(interceptor.fulfilled, interceptor.rejected);
+    if (typeof interceptor.runWhen === 'function' && interceptor.runWhen(config) === false) {
+      return;
+    }
+
+    synchronousRequestInterceptors = synchronousRequestInterceptors && interceptor.synchronous;
+
+    requestInterceptorChain.unshift(interceptor.fulfilled, interceptor.rejected);
   });
 
+  var responseInterceptorChain = [];
   this.interceptors.response.forEach(function pushResponseInterceptors(interceptor) {
-    chain.push(interceptor.fulfilled, interceptor.rejected);
+    responseInterceptorChain.push(interceptor.fulfilled, interceptor.rejected);
   });
 
-  while (chain.length) {
-    promise = promise.then(chain.shift(), chain.shift());
+  var promise;
+
+  if (!synchronousRequestInterceptors) {
+    var chain = [dispatchRequest, undefined];
+
+    Array.prototype.unshift.apply(chain, requestInterceptorChain);
+    chain = chain.concat(responseInterceptorChain);
+
+    promise = Promise.resolve(config);
+    while (chain.length) {
+      promise = promise.then(chain.shift(), chain.shift());
+    }
+
+    return promise;
+  }
+
+
+  var newConfig = config;
+  while (requestInterceptorChain.length) {
+    var onFulfilled = requestInterceptorChain.shift();
+    var onRejected = requestInterceptorChain.shift();
+    try {
+      newConfig = onFulfilled(newConfig);
+    } catch (error) {
+      onRejected(error);
+      break;
+    }
+  }
+
+  try {
+    promise = dispatchRequest(newConfig);
+  } catch (error) {
+    return Promise.reject(error);
+  }
+
+  while (responseInterceptorChain.length) {
+    promise = promise.then(responseInterceptorChain.shift(), responseInterceptorChain.shift());
   }
 
   return promise;
@@ -8132,10 +5974,12 @@ function InterceptorManager() {
  *
  * @return {Number} An ID used to remove interceptor later
  */
-InterceptorManager.prototype.use = function use(fulfilled, rejected) {
+InterceptorManager.prototype.use = function use(fulfilled, rejected, options) {
   this.handlers.push({
     fulfilled: fulfilled,
-    rejected: rejected
+    rejected: rejected,
+    synchronous: options ? options.synchronous : false,
+    runWhen: options ? options.runWhen : null
   });
   return this.handlers.length - 1;
 };
@@ -8236,6 +6080,7 @@ var utils = __nccwpck_require__(20328);
 var transformData = __nccwpck_require__(19812);
 var isCancel = __nccwpck_require__(64057);
 var defaults = __nccwpck_require__(98190);
+var Cancel = __nccwpck_require__(98875);
 
 /**
  * Throws a `Cancel` if cancellation has been requested.
@@ -8243,6 +6088,10 @@ var defaults = __nccwpck_require__(98190);
 function throwIfCancellationRequested(config) {
   if (config.cancelToken) {
     config.cancelToken.throwIfRequested();
+  }
+
+  if (config.signal && config.signal.aborted) {
+    throw new Cancel('canceled');
   }
 }
 
@@ -8259,7 +6108,8 @@ module.exports = function dispatchRequest(config) {
   config.headers = config.headers || {};
 
   // Transform request data
-  config.data = transformData(
+  config.data = transformData.call(
+    config,
     config.data,
     config.headers,
     config.transformRequest
@@ -8285,7 +6135,8 @@ module.exports = function dispatchRequest(config) {
     throwIfCancellationRequested(config);
 
     // Transform response data
-    response.data = transformData(
+    response.data = transformData.call(
+      config,
       response.data,
       response.headers,
       config.transformResponse
@@ -8298,7 +6149,8 @@ module.exports = function dispatchRequest(config) {
 
       // Transform response data
       if (reason && reason.response) {
-        reason.response.data = transformData(
+        reason.response.data = transformData.call(
+          config,
           reason.response.data,
           reason.response.headers,
           config.transformResponse
@@ -8354,7 +6206,8 @@ module.exports = function enhanceError(error, config, code, request, response) {
       stack: this.stack,
       // Axios
       config: this.config,
-      code: this.code
+      code: this.code,
+      status: this.response && this.response.status ? this.response.status : null
     };
   };
   return error;
@@ -8384,17 +6237,6 @@ module.exports = function mergeConfig(config1, config2) {
   config2 = config2 || {};
   var config = {};
 
-  var valueFromConfig2Keys = ['url', 'method', 'data'];
-  var mergeDeepPropertiesKeys = ['headers', 'auth', 'proxy', 'params'];
-  var defaultToConfig2Keys = [
-    'baseURL', 'transformRequest', 'transformResponse', 'paramsSerializer',
-    'timeout', 'timeoutMessage', 'withCredentials', 'adapter', 'responseType', 'xsrfCookieName',
-    'xsrfHeaderName', 'onUploadProgress', 'onDownloadProgress', 'decompress',
-    'maxContentLength', 'maxBodyLength', 'maxRedirects', 'transport', 'httpAgent',
-    'httpsAgent', 'cancelToken', 'socketPath', 'responseEncoding'
-  ];
-  var directMergeKeys = ['validateStatus'];
-
   function getMergedValue(target, source) {
     if (utils.isPlainObject(target) && utils.isPlainObject(source)) {
       return utils.merge(target, source);
@@ -8406,51 +6248,74 @@ module.exports = function mergeConfig(config1, config2) {
     return source;
   }
 
+  // eslint-disable-next-line consistent-return
   function mergeDeepProperties(prop) {
     if (!utils.isUndefined(config2[prop])) {
-      config[prop] = getMergedValue(config1[prop], config2[prop]);
+      return getMergedValue(config1[prop], config2[prop]);
     } else if (!utils.isUndefined(config1[prop])) {
-      config[prop] = getMergedValue(undefined, config1[prop]);
+      return getMergedValue(undefined, config1[prop]);
     }
   }
 
-  utils.forEach(valueFromConfig2Keys, function valueFromConfig2(prop) {
+  // eslint-disable-next-line consistent-return
+  function valueFromConfig2(prop) {
     if (!utils.isUndefined(config2[prop])) {
-      config[prop] = getMergedValue(undefined, config2[prop]);
+      return getMergedValue(undefined, config2[prop]);
     }
-  });
+  }
 
-  utils.forEach(mergeDeepPropertiesKeys, mergeDeepProperties);
-
-  utils.forEach(defaultToConfig2Keys, function defaultToConfig2(prop) {
+  // eslint-disable-next-line consistent-return
+  function defaultToConfig2(prop) {
     if (!utils.isUndefined(config2[prop])) {
-      config[prop] = getMergedValue(undefined, config2[prop]);
+      return getMergedValue(undefined, config2[prop]);
     } else if (!utils.isUndefined(config1[prop])) {
-      config[prop] = getMergedValue(undefined, config1[prop]);
+      return getMergedValue(undefined, config1[prop]);
     }
-  });
+  }
 
-  utils.forEach(directMergeKeys, function merge(prop) {
+  // eslint-disable-next-line consistent-return
+  function mergeDirectKeys(prop) {
     if (prop in config2) {
-      config[prop] = getMergedValue(config1[prop], config2[prop]);
+      return getMergedValue(config1[prop], config2[prop]);
     } else if (prop in config1) {
-      config[prop] = getMergedValue(undefined, config1[prop]);
+      return getMergedValue(undefined, config1[prop]);
     }
+  }
+
+  var mergeMap = {
+    'url': valueFromConfig2,
+    'method': valueFromConfig2,
+    'data': valueFromConfig2,
+    'baseURL': defaultToConfig2,
+    'transformRequest': defaultToConfig2,
+    'transformResponse': defaultToConfig2,
+    'paramsSerializer': defaultToConfig2,
+    'timeout': defaultToConfig2,
+    'timeoutMessage': defaultToConfig2,
+    'withCredentials': defaultToConfig2,
+    'adapter': defaultToConfig2,
+    'responseType': defaultToConfig2,
+    'xsrfCookieName': defaultToConfig2,
+    'xsrfHeaderName': defaultToConfig2,
+    'onUploadProgress': defaultToConfig2,
+    'onDownloadProgress': defaultToConfig2,
+    'decompress': defaultToConfig2,
+    'maxContentLength': defaultToConfig2,
+    'maxBodyLength': defaultToConfig2,
+    'transport': defaultToConfig2,
+    'httpAgent': defaultToConfig2,
+    'httpsAgent': defaultToConfig2,
+    'cancelToken': defaultToConfig2,
+    'socketPath': defaultToConfig2,
+    'responseEncoding': defaultToConfig2,
+    'validateStatus': mergeDirectKeys
+  };
+
+  utils.forEach(Object.keys(config1).concat(Object.keys(config2)), function computeConfigValue(prop) {
+    var merge = mergeMap[prop] || mergeDeepProperties;
+    var configValue = merge(prop);
+    (utils.isUndefined(configValue) && merge !== mergeDirectKeys) || (config[prop] = configValue);
   });
-
-  var axiosKeys = valueFromConfig2Keys
-    .concat(mergeDeepPropertiesKeys)
-    .concat(defaultToConfig2Keys)
-    .concat(directMergeKeys);
-
-  var otherKeys = Object
-    .keys(config1)
-    .concat(Object.keys(config2))
-    .filter(function filterAxiosKeys(key) {
-      return axiosKeys.indexOf(key) === -1;
-    });
-
-  utils.forEach(otherKeys, mergeDeepProperties);
 
   return config;
 };
@@ -8498,6 +6363,7 @@ module.exports = function settle(resolve, reject, response) {
 
 
 var utils = __nccwpck_require__(20328);
+var defaults = __nccwpck_require__(98190);
 
 /**
  * Transform the data for a request or a response
@@ -8508,9 +6374,10 @@ var utils = __nccwpck_require__(20328);
  * @returns {*} The resulting transformed data
  */
 module.exports = function transformData(data, headers, fns) {
+  var context = this || defaults;
   /*eslint no-param-reassign:0*/
   utils.forEach(fns, function transform(fn) {
-    data = fn(data, headers);
+    data = fn.call(context, data, headers);
   });
 
   return data;
@@ -8527,6 +6394,7 @@ module.exports = function transformData(data, headers, fns) {
 
 var utils = __nccwpck_require__(20328);
 var normalizeHeaderName = __nccwpck_require__(36240);
+var enhanceError = __nccwpck_require__(21516);
 
 var DEFAULT_CONTENT_TYPE = {
   'Content-Type': 'application/x-www-form-urlencoded'
@@ -8550,12 +6418,35 @@ function getDefaultAdapter() {
   return adapter;
 }
 
+function stringifySafely(rawValue, parser, encoder) {
+  if (utils.isString(rawValue)) {
+    try {
+      (parser || JSON.parse)(rawValue);
+      return utils.trim(rawValue);
+    } catch (e) {
+      if (e.name !== 'SyntaxError') {
+        throw e;
+      }
+    }
+  }
+
+  return (encoder || JSON.stringify)(rawValue);
+}
+
 var defaults = {
+
+  transitional: {
+    silentJSONParsing: true,
+    forcedJSONParsing: true,
+    clarifyTimeoutError: false
+  },
+
   adapter: getDefaultAdapter(),
 
   transformRequest: [function transformRequest(data, headers) {
     normalizeHeaderName(headers, 'Accept');
     normalizeHeaderName(headers, 'Content-Type');
+
     if (utils.isFormData(data) ||
       utils.isArrayBuffer(data) ||
       utils.isBuffer(data) ||
@@ -8572,20 +6463,32 @@ var defaults = {
       setContentTypeIfUnset(headers, 'application/x-www-form-urlencoded;charset=utf-8');
       return data.toString();
     }
-    if (utils.isObject(data)) {
-      setContentTypeIfUnset(headers, 'application/json;charset=utf-8');
-      return JSON.stringify(data);
+    if (utils.isObject(data) || (headers && headers['Content-Type'] === 'application/json')) {
+      setContentTypeIfUnset(headers, 'application/json');
+      return stringifySafely(data);
     }
     return data;
   }],
 
   transformResponse: [function transformResponse(data) {
-    /*eslint no-param-reassign:0*/
-    if (typeof data === 'string') {
+    var transitional = this.transitional || defaults.transitional;
+    var silentJSONParsing = transitional && transitional.silentJSONParsing;
+    var forcedJSONParsing = transitional && transitional.forcedJSONParsing;
+    var strictJSONParsing = !silentJSONParsing && this.responseType === 'json';
+
+    if (strictJSONParsing || (forcedJSONParsing && utils.isString(data) && data.length)) {
       try {
-        data = JSON.parse(data);
-      } catch (e) { /* Ignore */ }
+        return JSON.parse(data);
+      } catch (e) {
+        if (strictJSONParsing) {
+          if (e.name === 'SyntaxError') {
+            throw enhanceError(e, this, 'E_JSON_PARSE');
+          }
+          throw e;
+        }
+      }
     }
+
     return data;
   }],
 
@@ -8603,12 +6506,12 @@ var defaults = {
 
   validateStatus: function validateStatus(status) {
     return status >= 200 && status < 300;
-  }
-};
+  },
 
-defaults.headers = {
-  common: {
-    'Accept': 'application/json, text/plain, */*'
+  headers: {
+    common: {
+      'Accept': 'application/json, text/plain, */*'
+    }
   }
 };
 
@@ -8622,6 +6525,15 @@ utils.forEach(['post', 'put', 'patch'], function forEachMethodWithData(method) {
 
 module.exports = defaults;
 
+
+/***/ }),
+
+/***/ 94322:
+/***/ ((module) => {
+
+module.exports = {
+  "version": "0.24.0"
+};
 
 /***/ }),
 
@@ -9038,6 +6950,96 @@ module.exports = function spread(callback) {
 
 /***/ }),
 
+/***/ 51632:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+"use strict";
+
+
+var VERSION = (__nccwpck_require__(94322).version);
+
+var validators = {};
+
+// eslint-disable-next-line func-names
+['object', 'boolean', 'number', 'function', 'string', 'symbol'].forEach(function(type, i) {
+  validators[type] = function validator(thing) {
+    return typeof thing === type || 'a' + (i < 1 ? 'n ' : ' ') + type;
+  };
+});
+
+var deprecatedWarnings = {};
+
+/**
+ * Transitional option validator
+ * @param {function|boolean?} validator - set to false if the transitional option has been removed
+ * @param {string?} version - deprecated version / removed since version
+ * @param {string?} message - some message with additional info
+ * @returns {function}
+ */
+validators.transitional = function transitional(validator, version, message) {
+  function formatMessage(opt, desc) {
+    return '[Axios v' + VERSION + '] Transitional option \'' + opt + '\'' + desc + (message ? '. ' + message : '');
+  }
+
+  // eslint-disable-next-line func-names
+  return function(value, opt, opts) {
+    if (validator === false) {
+      throw new Error(formatMessage(opt, ' has been removed' + (version ? ' in ' + version : '')));
+    }
+
+    if (version && !deprecatedWarnings[opt]) {
+      deprecatedWarnings[opt] = true;
+      // eslint-disable-next-line no-console
+      console.warn(
+        formatMessage(
+          opt,
+          ' has been deprecated since v' + version + ' and will be removed in the near future'
+        )
+      );
+    }
+
+    return validator ? validator(value, opt, opts) : true;
+  };
+};
+
+/**
+ * Assert object's properties type
+ * @param {object} options
+ * @param {object} schema
+ * @param {boolean?} allowUnknown
+ */
+
+function assertOptions(options, schema, allowUnknown) {
+  if (typeof options !== 'object') {
+    throw new TypeError('options must be an object');
+  }
+  var keys = Object.keys(options);
+  var i = keys.length;
+  while (i-- > 0) {
+    var opt = keys[i];
+    var validator = schema[opt];
+    if (validator) {
+      var value = options[opt];
+      var result = value === undefined || validator(value, opt, options);
+      if (result !== true) {
+        throw new TypeError('option ' + opt + ' must be ' + result);
+      }
+      continue;
+    }
+    if (allowUnknown !== true) {
+      throw Error('Unknown option ' + opt);
+    }
+  }
+}
+
+module.exports = {
+  assertOptions: assertOptions,
+  validators: validators
+};
+
+
+/***/ }),
+
 /***/ 20328:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
@@ -9045,8 +7047,6 @@ module.exports = function spread(callback) {
 
 
 var bind = __nccwpck_require__(77065);
-
-/*global toString:true*/
 
 // utils is a library of generic helper functions non-specific to axios
 
@@ -9231,7 +7231,7 @@ function isURLSearchParams(val) {
  * @returns {String} The String freed of excess whitespace
  */
 function trim(str) {
-  return str.replace(/^\s*/, '').replace(/\s*$/, '');
+  return str.trim ? str.trim() : str.replace(/^\s+|\s+$/g, '');
 }
 
 /**
@@ -9394,6 +7394,2582 @@ module.exports = {
   stripBOM: stripBOM
 };
 
+
+/***/ }),
+
+/***/ 62757:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.barecheckApiUrl = exports.currentDir = void 0;
+exports.currentDir = process.cwd();
+exports.barecheckApiUrl = 'https://api.barecheck.com/graphql';
+//# sourceMappingURL=config.js.map
+
+/***/ }),
+
+/***/ 47127:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.api = exports.detectClones = void 0;
+const endpoints = __importStar(__nccwpck_require__(43473));
+var jscpd_1 = __nccwpck_require__(18057);
+Object.defineProperty(exports, "detectClones", ({ enumerable: true, get: function () { return jscpd_1.detectClones; } }));
+exports.api = {
+    endpoints
+};
+//# sourceMappingURL=index.js.map
+
+/***/ }),
+
+/***/ 18057:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.detectClones = void 0;
+const core_1 = __nccwpck_require__(82576);
+const finder_1 = __nccwpck_require__(70982);
+const tokenizer_1 = __nccwpck_require__(1551);
+const detectClones = (path, options = {}) => __awaiter(void 0, void 0, void 0, function* () {
+    const defaultOptions = Object.assign(Object.assign({}, (0, core_1.getDefaultOptions)()), {
+        format: (0, tokenizer_1.getSupportedFormats)()
+    });
+    const jscpdOptions = Object.assign(Object.assign(Object.assign({}, defaultOptions), options), { path });
+    const tokenizer = new tokenizer_1.Tokenizer();
+    // here you can use any store what implement IStore interface
+    const store = new core_1.MemoryStore();
+    const statistic = new core_1.Statistic(jscpdOptions);
+    const files = (0, finder_1.getFilesToDetect)(jscpdOptions);
+    const detector = new finder_1.InFilesDetector(tokenizer, store, statistic, jscpdOptions);
+    const clones = yield detector.detect(files);
+    return { statistic: statistic.getStatistic(), clones };
+});
+exports.detectClones = detectClones;
+exports["default"] = exports.detectClones;
+//# sourceMappingURL=jscpd.js.map
+
+/***/ }),
+
+/***/ 43473:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.getProjectMetric = exports.setProjectMetric = exports.createGithubAccessToken = void 0;
+const axios_1 = __importDefault(__nccwpck_require__(96545));
+const _config_1 = __nccwpck_require__(62757);
+// TODO: define api request response interfaces
+const makeRequest = (query, variables) => __awaiter(void 0, void 0, void 0, function* () {
+    const { data } = yield axios_1.default.post(_config_1.barecheckApiUrl, {
+        query,
+        variables
+    }, {
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    });
+    return data;
+});
+const createGithubAccessToken = (variables) => __awaiter(void 0, void 0, void 0, function* () {
+    const query = `mutation createGithubAccessToken($githubAppToken: String!) {
+    createGithubAccessToken(githubAppToken:$githubAppToken) {
+      success
+      code
+      token
+    }
+  }`;
+    const response = yield makeRequest(query, variables);
+    if (!response.data || !response.data.createGithubAccessToken.success) {
+        throw new Error("Couldn't fetch access token for Github application. Check if you use the correct `BARECHECK_GITHUB_APP_TOKEN`");
+    }
+    return response.data.createGithubAccessToken;
+});
+exports.createGithubAccessToken = createGithubAccessToken;
+const setProjectMetric = (variables) => __awaiter(void 0, void 0, void 0, function* () {
+    const query = `mutation setProjectMetric($apiKey: String!, $ref: String!, $sha: String!, $coverage: Float!) {
+    setProjectMetric(apiKey: $apiKey, ref: $ref, sha: $sha, coverage: $coverage) {
+      code
+      success
+      projectMetricId
+    }
+  }
+  `;
+    const response = yield makeRequest(query, variables);
+    if (!response.data || !response.data.setProjectMetric.success) {
+        throw new Error("Couldn't send your project metric. Check if `BARECHECK_API_KEY` property set correctly and restart action");
+    }
+    return response.data.setProjectMetric;
+});
+exports.setProjectMetric = setProjectMetric;
+const getProjectMetric = (variables) => __awaiter(void 0, void 0, void 0, function* () {
+    const query = `query projectMetric($apiKey: String!, $ref: String!, $sha: String!) {
+    projectMetric(apiKey: $apiKey, ref:$ref, sha:$sha){
+      projectId
+      ref
+      sha
+      coverage
+      createdAt
+    }
+  }
+  `;
+    const response = yield makeRequest(query, variables);
+    if (!response.data) {
+        return null;
+    }
+    return response.data.projectMetric;
+});
+exports.getProjectMetric = getProjectMetric;
+//# sourceMappingURL=endpoints.js.map
+
+/***/ }),
+
+/***/ 71896:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const rabin_karp_1 = __nccwpck_require__(70569);
+const validators_1 = __nccwpck_require__(65799);
+const mode_1 = __nccwpck_require__(72010);
+// TODO replace to own event emitter
+const EventEmitter = __nccwpck_require__(11848);
+class Detector extends EventEmitter {
+    constructor(tokenizer, store, cloneValidators = [], options) {
+        super();
+        this.tokenizer = tokenizer;
+        this.store = store;
+        this.cloneValidators = cloneValidators;
+        this.options = options;
+        this.initCloneValidators();
+        this.algorithm = new rabin_karp_1.RabinKarp(this.options, this, this.cloneValidators);
+        this.options.minTokens = this.options.minTokens || 50;
+        this.options.maxLines = this.options.maxLines || 500;
+        this.options.minLines = this.options.minLines || 5;
+        this.options.mode = this.options.mode || mode_1.mild;
+    }
+    detect(id, text, format) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const tokenMaps = this.tokenizer.generateMaps(id, text, format, this.options);
+            // TODO change stores implementation
+            this.store.namespace(format);
+            const detect = (tokenMap, clones) => __awaiter(this, void 0, void 0, function* () {
+                if (tokenMap) {
+                    this.emit('START_DETECTION', { source: tokenMap });
+                    return this.algorithm
+                        .run(tokenMap, this.store)
+                        .then((clns) => {
+                        clones.push(...clns);
+                        const nextTokenMap = tokenMaps.pop();
+                        if (nextTokenMap) {
+                            return detect(nextTokenMap, clones);
+                        }
+                        else {
+                            return clones;
+                        }
+                    });
+                }
+            });
+            return detect(tokenMaps.pop(), []);
+        });
+    }
+    initCloneValidators() {
+        if (this.options.minLines || this.options.maxLines) {
+            this.cloneValidators.push(new validators_1.LinesLengthCloneValidator());
+        }
+    }
+}
+exports.Detector = Detector;
+//# sourceMappingURL=detector.js.map
+
+/***/ }),
+
+/***/ 82576:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+function __export(m) {
+    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
+}
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+__export(__nccwpck_require__(71896));
+__export(__nccwpck_require__(72010));
+__export(__nccwpck_require__(94994));
+__export(__nccwpck_require__(84222));
+__export(__nccwpck_require__(77691));
+//# sourceMappingURL=index.js.map
+
+/***/ }),
+
+/***/ 72010:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+function strict(token) {
+    return token.type !== 'ignore';
+}
+exports.strict = strict;
+function mild(token) {
+    return strict(token) && token.type !== 'empty' && token.type !== 'new_line';
+}
+exports.mild = mild;
+function weak(token) {
+    return mild(token)
+        && token.format !== 'comment'
+        && token.type !== 'comment'
+        && token.type !== 'block-comment';
+}
+exports.weak = weak;
+const MODES = {
+    mild,
+    strict,
+    weak,
+};
+function getModeByName(name) {
+    if (name in MODES) {
+        return MODES[name];
+    }
+    throw new Error(`Mode ${name} does not supported yet.`);
+}
+exports.getModeByName = getModeByName;
+function getModeHandler(mode) {
+    return typeof mode === 'string' ? getModeByName(mode) : mode;
+}
+exports.getModeHandler = getModeHandler;
+//# sourceMappingURL=mode.js.map
+
+/***/ }),
+
+/***/ 94994:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const mode_1 = __nccwpck_require__(72010);
+function getDefaultOptions() {
+    return {
+        executionId: new Date().toISOString(),
+        path: [process.cwd()],
+        mode: mode_1.getModeHandler('mild'),
+        minLines: 5,
+        maxLines: 1000,
+        maxSize: '100kb',
+        minTokens: 50,
+        output: './report',
+        reporters: ['console'],
+        ignore: [],
+        threshold: undefined,
+        formatsExts: {},
+        debug: false,
+        silent: false,
+        blame: false,
+        cache: true,
+        absolute: false,
+        noSymlinks: false,
+        skipLocal: false,
+        ignoreCase: false,
+        gitignore: false,
+        reportersOptions: {},
+        exitCode: 0,
+    };
+}
+exports.getDefaultOptions = getDefaultOptions;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getOption(name, options) {
+    const defaultOptions = getDefaultOptions();
+    return options ? options[name] || defaultOptions[name] : defaultOptions[name];
+}
+exports.getOption = getOption;
+//# sourceMappingURL=options.js.map
+
+/***/ }),
+
+/***/ 70569:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const validators_1 = __nccwpck_require__(65799);
+class RabinKarp {
+    constructor(options, eventEmitter, cloneValidators) {
+        this.options = options;
+        this.eventEmitter = eventEmitter;
+        this.cloneValidators = cloneValidators;
+    }
+    run(tokenMap, store) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return new Promise((resolve => {
+                let mapFrameInStore;
+                let clone = null;
+                const clones = [];
+                // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+                const loop = () => {
+                    const iteration = tokenMap.next();
+                    store
+                        .get(iteration.value.id)
+                        .then((mapFrameFromStore) => {
+                        mapFrameInStore = mapFrameFromStore;
+                        if (!clone) {
+                            clone = RabinKarp.createClone(tokenMap.getFormat(), iteration.value, mapFrameInStore);
+                        }
+                    }, () => {
+                        if (clone && this.validate(clone)) {
+                            clones.push(clone);
+                        }
+                        clone = null;
+                        if (iteration.value.id) {
+                            return store.set(iteration.value.id, iteration.value);
+                        }
+                    })
+                        .finally(() => {
+                        if (!iteration.done) {
+                            if (clone) {
+                                clone = RabinKarp.enlargeClone(clone, iteration.value, mapFrameInStore);
+                            }
+                            loop();
+                        }
+                        else {
+                            resolve(clones);
+                        }
+                    });
+                };
+                loop();
+            }));
+        });
+    }
+    validate(clone) {
+        const validation = validators_1.runCloneValidators(clone, this.options, this.cloneValidators);
+        if (validation.status) {
+            this.eventEmitter.emit('CLONE_FOUND', { clone });
+        }
+        else {
+            this.eventEmitter.emit('CLONE_SKIPPED', { clone, validation });
+        }
+        return validation.status;
+    }
+    static createClone(format, mapFrameA, mapFrameB) {
+        return {
+            format,
+            foundDate: new Date().getTime(),
+            duplicationA: {
+                sourceId: mapFrameA.sourceId,
+                start: mapFrameA.start.loc.start,
+                end: mapFrameA.end.loc.end,
+                range: [mapFrameA.start.range[0], mapFrameA.end.range[1]],
+            },
+            duplicationB: {
+                sourceId: mapFrameB.sourceId,
+                start: mapFrameB.start.loc.start,
+                end: mapFrameB.end.loc.end,
+                range: [mapFrameB.start.range[0], mapFrameB.end.range[1]],
+            },
+        };
+    }
+    static enlargeClone(clone, mapFrameA, mapFrameB) {
+        clone.duplicationA.range[1] = mapFrameA.end.range[1];
+        clone.duplicationA.end = mapFrameA.end.loc.end;
+        clone.duplicationB.range[1] = mapFrameB.end.range[1];
+        clone.duplicationB.end = mapFrameB.end.loc.end;
+        return clone;
+    }
+}
+exports.RabinKarp = RabinKarp;
+//# sourceMappingURL=rabin-karp.js.map
+
+/***/ }),
+
+/***/ 84222:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+class Statistic {
+    constructor(options) {
+        this.options = options;
+        this.statistic = {
+            detectionDate: new Date().toISOString(),
+            formats: {},
+            total: Statistic.getDefaultStatistic(),
+        };
+    }
+    static getDefaultStatistic() {
+        return {
+            lines: 0,
+            tokens: 0,
+            sources: 0,
+            clones: 0,
+            duplicatedLines: 0,
+            duplicatedTokens: 0,
+            percentage: 0,
+            percentageTokens: 0,
+            newDuplicatedLines: 0,
+            newClones: 0,
+        };
+    }
+    subscribe() {
+        return {
+            CLONE_FOUND: this.cloneFound.bind(this),
+            START_DETECTION: this.matchSource.bind(this),
+        };
+    }
+    getStatistic() {
+        return this.statistic;
+    }
+    cloneFound(payload) {
+        const { clone } = payload;
+        const id = clone.duplicationA.sourceId;
+        const id2 = clone.duplicationB.sourceId;
+        const linesCount = clone.duplicationA.end.line - clone.duplicationA.start.line;
+        const duplicatedTokens = clone.duplicationA.end.position - clone.duplicationA.start.position;
+        this.statistic.total.clones++;
+        this.statistic.total.duplicatedLines += linesCount;
+        this.statistic.total.duplicatedTokens += duplicatedTokens;
+        this.statistic.formats[clone.format].total.clones++;
+        this.statistic.formats[clone.format].total.duplicatedLines += linesCount;
+        this.statistic.formats[clone.format].total.duplicatedTokens += duplicatedTokens;
+        this.statistic.formats[clone.format].sources[id].clones++;
+        this.statistic.formats[clone.format].sources[id].duplicatedLines += linesCount;
+        this.statistic.formats[clone.format].sources[id].duplicatedTokens += duplicatedTokens;
+        this.statistic.formats[clone.format].sources[id2].clones++;
+        this.statistic.formats[clone.format].sources[id2].duplicatedLines += linesCount;
+        this.statistic.formats[clone.format].sources[id2].duplicatedTokens += duplicatedTokens;
+        this.updatePercentage(clone.format);
+    }
+    matchSource(payload) {
+        const { source } = payload;
+        const format = source.getFormat();
+        if (!(format in this.statistic.formats)) {
+            this.statistic.formats[format] = {
+                sources: {},
+                total: Statistic.getDefaultStatistic(),
+            };
+        }
+        this.statistic.total.sources++;
+        this.statistic.total.lines += source.getLinesCount();
+        this.statistic.total.tokens += source.getTokensCount();
+        this.statistic.formats[format].total.sources++;
+        this.statistic.formats[format].total.lines += source.getLinesCount();
+        this.statistic.formats[format].total.tokens += source.getTokensCount();
+        this.statistic.formats[format].sources[source.getId()] =
+            this.statistic.formats[format].sources[source.getId()] || Statistic.getDefaultStatistic();
+        this.statistic.formats[format].sources[source.getId()].sources = 1;
+        this.statistic.formats[format].sources[source.getId()].lines += source.getLinesCount();
+        this.statistic.formats[format].sources[source.getId()].tokens += source.getTokensCount();
+        this.updatePercentage(format);
+    }
+    updatePercentage(format) {
+        this.statistic.total.percentage = Statistic.calculatePercentage(this.statistic.total.lines, this.statistic.total.duplicatedLines);
+        this.statistic.total.percentageTokens = Statistic.calculatePercentage(this.statistic.total.tokens, this.statistic.total.duplicatedTokens);
+        this.statistic.formats[format].total.percentage = Statistic.calculatePercentage(this.statistic.formats[format].total.lines, this.statistic.formats[format].total.duplicatedLines);
+        this.statistic.formats[format].total.percentageTokens = Statistic.calculatePercentage(this.statistic.formats[format].total.tokens, this.statistic.formats[format].total.duplicatedTokens);
+        Object.entries(this.statistic.formats[format].sources).forEach(([id, stat]) => {
+            this.statistic.formats[format].sources[id].percentage = Statistic.calculatePercentage(stat.lines, stat.duplicatedLines);
+            this.statistic.formats[format].sources[id].percentageTokens = Statistic.calculatePercentage(stat.tokens, stat.duplicatedTokens);
+        });
+    }
+    static calculatePercentage(total, cloned) {
+        return total ? Math.round((10000 * cloned) / total) / 100 : 0.0;
+    }
+}
+exports.Statistic = Statistic;
+//# sourceMappingURL=statistic.js.map
+
+/***/ }),
+
+/***/ 77691:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+class MemoryStore {
+    constructor() {
+        this.values = {};
+    }
+    namespace(namespace) {
+        this._namespace = namespace;
+        this.values[namespace] = this.values[namespace] || {};
+    }
+    get(key) {
+        return new Promise((resolve, reject) => {
+            if (key in this.values[this._namespace]) {
+                resolve(this.values[this._namespace][key]);
+            }
+            else {
+                reject(new Error('not found'));
+            }
+        });
+    }
+    set(key, value) {
+        this.values[this._namespace][key] = value;
+        return Promise.resolve(value);
+    }
+    close() {
+        this.values = {};
+    }
+}
+exports.MemoryStore = MemoryStore;
+//# sourceMappingURL=memory.js.map
+
+/***/ }),
+
+/***/ 65799:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+function __export(m) {
+    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
+}
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+__export(__nccwpck_require__(97942));
+__export(__nccwpck_require__(98147));
+//# sourceMappingURL=index.js.map
+
+/***/ }),
+
+/***/ 97942:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+class LinesLengthCloneValidator {
+    validate(clone, options) {
+        const lines = clone.duplicationA.end.line - clone.duplicationA.start.line;
+        const status = lines >= options.minLines;
+        return {
+            status,
+            message: status ? ['ok'] : [`Lines of code less then limit (${lines} < ${options.minLines})`],
+        };
+    }
+}
+exports.LinesLengthCloneValidator = LinesLengthCloneValidator;
+//# sourceMappingURL=lines-length-clone.validator.js.map
+
+/***/ }),
+
+/***/ 98147:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+function runCloneValidators(clone, options, validators) {
+    return validators.reduce((acc, validator) => {
+        const res = validator.validate(clone, options);
+        return Object.assign(Object.assign({}, acc), { status: res.status && acc.status, message: res.message ? [...acc.message, ...res.message] : acc.message });
+    }, { status: true, message: [], clone });
+}
+exports.runCloneValidators = runCloneValidators;
+//# sourceMappingURL=validator.js.map
+
+/***/ }),
+
+/***/ 37676:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const core_1 = __nccwpck_require__(82576);
+const fast_glob_1 = __nccwpck_require__(43664);
+const tokenizer_1 = __nccwpck_require__(1551);
+const fs_extra_1 = __nccwpck_require__(5630);
+const safe_1 = __nccwpck_require__(41997);
+const fs_1 = __nccwpck_require__(57147);
+const bytes = __nccwpck_require__(86966);
+function isFile(path) {
+    try {
+        const stat = fs_1.lstatSync(path);
+        return stat.isFile();
+    }
+    catch (e) {
+        // lstatSync throws an error if path doesn't exist
+        return false;
+    }
+}
+function skipNotSupportedFormats(options) {
+    return (entry) => {
+        const { path } = entry;
+        const format = tokenizer_1.getFormatByFile(path, options.formatsExts);
+        const shouldNotSkip = format && options.format && options.format.includes(format);
+        if ((options.debug || options.verbose) && !shouldNotSkip) {
+            console.log(`File ${path} skipped! Format "${format}" does not included to supported formats.`);
+        }
+        return shouldNotSkip;
+    };
+}
+function skipBigFiles(options) {
+    return (entry) => {
+        const { stats, path } = entry;
+        const shouldSkip = bytes.parse(stats.size) > bytes.parse(core_1.getOption('maxSize', options));
+        if (options.debug && shouldSkip) {
+            console.log(`File ${path} skipped! Size more then limit (${bytes(stats.size)} > ${core_1.getOption('maxSize', options)})`);
+        }
+        return !shouldSkip;
+    };
+}
+function skipFilesIfLinesOfContentNotInLimits(options) {
+    return (entry) => {
+        const { path, content } = entry;
+        const lines = content.split('\n').length;
+        const minLines = core_1.getOption('minLines', options);
+        const maxLines = core_1.getOption('maxLines', options);
+        if (lines < minLines || lines > maxLines) {
+            if ((options.debug || options.verbose)) {
+                console.log(safe_1.grey(`File ${path} skipped! Code lines=${lines} not in limits (${minLines}:${maxLines})`));
+            }
+            return false;
+        }
+        return true;
+    };
+}
+function addContentToEntry(entry) {
+    const { path } = entry;
+    const content = fs_extra_1.readFileSync(path).toString();
+    return Object.assign(Object.assign({}, entry), { content });
+}
+function getFilesToDetect(options) {
+    const pattern = options.pattern || '**/*';
+    const patterns = options.path.map((path) => {
+        if (isFile(path)) {
+            return path;
+        }
+        return path.substr(path.length - 1) === '/' ? `${path}${pattern}` : `${path}/${pattern}`;
+    });
+    return fast_glob_1.sync(patterns, {
+        ignore: options.ignore,
+        onlyFiles: true,
+        dot: true,
+        stats: true,
+        absolute: options.absolute,
+        followSymbolicLinks: !options.noSymlinks,
+    })
+        .filter(skipNotSupportedFormats(options))
+        .filter(skipBigFiles(options))
+        .map(addContentToEntry)
+        .filter(skipFilesIfLinesOfContentNotInLimits(options));
+}
+exports.getFilesToDetect = getFilesToDetect;
+//# sourceMappingURL=files.js.map
+
+/***/ }),
+
+/***/ 77528:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const blamer_1 = __nccwpck_require__(56781);
+class BlamerHook {
+    process(clones) {
+        return Promise.all(clones.map((clone) => BlamerHook.blameLines(clone)));
+    }
+    static blameLines(clone) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const blamer = new blamer_1.default();
+            const blamedFileA = yield blamer.blameByFile(clone.duplicationA.sourceId);
+            const blamedFileB = yield blamer.blameByFile(clone.duplicationB.sourceId);
+            clone.duplicationA.blame = BlamerHook.getBlamedLines(blamedFileA, clone.duplicationA.start.line, clone.duplicationA.end.line);
+            clone.duplicationB.blame = BlamerHook.getBlamedLines(blamedFileB, clone.duplicationB.start.line, clone.duplicationB.end.line);
+            return clone;
+        });
+    }
+    static getBlamedLines(blamedFiles, start, end) {
+        // TODO rewrite the method
+        const [file] = Object.keys(blamedFiles);
+        const result = {};
+        Object.keys(blamedFiles[file])
+            .filter((lineNumber) => {
+            return Number(lineNumber) >= start && Number(lineNumber) <= end;
+        })
+            .map((lineNumber) => blamedFiles[file][lineNumber])
+            .forEach((info) => {
+            result[info.line] = info;
+        });
+        return result;
+    }
+}
+exports.BlamerHook = BlamerHook;
+//# sourceMappingURL=blamer.js.map
+
+/***/ }),
+
+/***/ 91956:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const fs_1 = __nccwpck_require__(57147);
+class FragmentsHook {
+    process(clones) {
+        return Promise.all(clones.map((clone) => FragmentsHook.addFragments(clone)));
+    }
+    static addFragments(clone) {
+        const codeA = fs_1.readFileSync(clone.duplicationA.sourceId).toString();
+        const codeB = fs_1.readFileSync(clone.duplicationB.sourceId).toString();
+        clone.duplicationA.fragment = codeA.substring(clone.duplicationA.range[0], clone.duplicationA.range[1]);
+        clone.duplicationB.fragment = codeB.substring(clone.duplicationB.range[0], clone.duplicationB.range[1]);
+        return clone;
+    }
+}
+exports.FragmentsHook = FragmentsHook;
+//# sourceMappingURL=fragment.js.map
+
+/***/ }),
+
+/***/ 132:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+function __export(m) {
+    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
+}
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+__export(__nccwpck_require__(77528));
+__export(__nccwpck_require__(91956));
+//# sourceMappingURL=index.js.map
+
+/***/ }),
+
+/***/ 59114:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const core_1 = __nccwpck_require__(82576);
+const tokenizer_1 = __nccwpck_require__(1551);
+const validators_1 = __nccwpck_require__(28758);
+class InFilesDetector {
+    constructor(tokenizer, store, statistic, options) {
+        this.tokenizer = tokenizer;
+        this.store = store;
+        this.statistic = statistic;
+        this.options = options;
+        this.reporters = [];
+        this.subscribes = [];
+        this.postHooks = [];
+        this.registerSubscriber(this.statistic);
+    }
+    registerReporter(reporter) {
+        this.reporters.push(reporter);
+    }
+    registerSubscriber(subscriber) {
+        this.subscribes.push(subscriber);
+    }
+    registerHook(hook) {
+        this.postHooks.push(hook);
+    }
+    detect(fls) {
+        const files = fls.filter((f) => !!f);
+        if (files.length === 0) {
+            return Promise.resolve([]);
+        }
+        const options = this.options;
+        const hooks = [...this.postHooks];
+        const store = this.store;
+        const validators = [];
+        if (options.skipLocal) {
+            validators.push(new validators_1.SkipLocalValidator());
+        }
+        const detector = new core_1.Detector(this.tokenizer, store, validators, options);
+        this.subscribes.forEach((listener) => {
+            Object
+                .entries(listener.subscribe())
+                .map(([event, handler]) => detector.on(event, handler));
+        });
+        const detect = (entry, clones = []) => {
+            const { path, content } = entry;
+            const format = tokenizer_1.getFormatByFile(path, options.formatsExts);
+            return detector
+                .detect(path, content, format)
+                .then((clns) => {
+                if (clns) {
+                    clones.push(...clns);
+                }
+                const file = files.pop();
+                if (file) {
+                    return detect(file, clones);
+                }
+                return clones;
+            });
+        };
+        const processHooks = (hook, detectedClones) => {
+            return hook
+                .process(detectedClones)
+                .then((clones) => {
+                const nextHook = hooks.pop();
+                if (nextHook) {
+                    return processHooks(nextHook, clones);
+                }
+                return clones;
+            });
+        };
+        return detect(files.pop())
+            .then((clones) => {
+            const hook = hooks.pop();
+            if (hook) {
+                return processHooks(hook, clones);
+            }
+            return clones;
+        })
+            .then((clones) => {
+            const statistic = this.statistic.getStatistic();
+            this.reporters.forEach((reporter) => {
+                reporter.report(clones, statistic);
+            });
+            return clones;
+        });
+    }
+}
+exports.InFilesDetector = InFilesDetector;
+//# sourceMappingURL=in-files-detector.js.map
+
+/***/ }),
+
+/***/ 70982:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+function __export(m) {
+    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
+}
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+__export(__nccwpck_require__(59114));
+__export(__nccwpck_require__(37676));
+__export(__nccwpck_require__(132));
+__export(__nccwpck_require__(78846));
+__export(__nccwpck_require__(62556));
+__export(__nccwpck_require__(28758));
+__export(__nccwpck_require__(10206));
+//# sourceMappingURL=index.js.map
+
+/***/ }),
+
+/***/ 32358:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const reports_1 = __nccwpck_require__(98065);
+const clone_found_1 = __nccwpck_require__(31753);
+const safe_1 = __nccwpck_require__(41997);
+const Table = __nccwpck_require__(2101);
+const TABLE_OPTIONS = {
+    chars: {
+        top: '',
+        'top-mid': '',
+        'top-left': '',
+        'top-right': '',
+        bottom: '',
+        'bottom-mid': '',
+        'bottom-left': '',
+        'bottom-right': '',
+        left: '',
+        'left-mid': '',
+        mid: '',
+        'mid-mid': '',
+        right: '',
+        'right-mid': '',
+        middle: '│',
+    },
+};
+class ConsoleFullReporter {
+    constructor(options) {
+        this.options = options;
+    }
+    report(clones) {
+        clones.forEach((clone) => {
+            this.cloneFullFound(clone);
+        });
+        console.log(safe_1.grey(`Found ${clones.length} clones.`));
+    }
+    cloneFullFound(clone) {
+        const table = new Table(TABLE_OPTIONS);
+        clone_found_1.cloneFound(clone, this.options);
+        clone.duplicationA.fragment.split('\n').forEach((line, position) => {
+            (table).push(reports_1.generateLine(clone, position, line));
+        });
+        console.log(table.toString());
+        console.log('');
+    }
+}
+exports.ConsoleFullReporter = ConsoleFullReporter;
+//# sourceMappingURL=console-full.js.map
+
+/***/ }),
+
+/***/ 94091:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const safe_1 = __nccwpck_require__(41997);
+const reports_1 = __nccwpck_require__(98065);
+const Table = __nccwpck_require__(2101);
+class ConsoleReporter {
+    constructor(options) {
+        this.options = options;
+    }
+    report(clones, statistic = undefined) {
+        if (statistic && !this.options.silent) {
+            const table = new Table({
+                head: ['Format', 'Files analyzed', 'Total lines', 'Total tokens', 'Clones found', 'Duplicated lines', 'Duplicated tokens'],
+            });
+            Object.keys(statistic.formats)
+                .filter((format) => statistic.formats[format].sources)
+                .forEach((format) => {
+                table.push(reports_1.convertStatisticToArray(format, statistic.formats[format].total));
+            });
+            table.push(reports_1.convertStatisticToArray(safe_1.bold('Total:'), statistic.total));
+            console.log(table.toString());
+            console.log(safe_1.grey(`Found ${clones.length} clones.`));
+        }
+    }
+}
+exports.ConsoleReporter = ConsoleReporter;
+//# sourceMappingURL=console.js.map
+
+/***/ }),
+
+/***/ 42072:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const core_1 = __nccwpck_require__(82576);
+const fs_extra_1 = __nccwpck_require__(5630);
+const safe_1 = __nccwpck_require__(41997);
+const path_1 = __nccwpck_require__(71017);
+const reports_1 = __nccwpck_require__(98065);
+class CSVReporter {
+    constructor(options) {
+        this.options = options;
+    }
+    report(clones, statistic) {
+        const report = [
+            ['Format', 'Files analyzed', 'Total lines', 'Total tokens', 'Clones found', 'Duplicated lines', 'Duplicated tokens'],
+            ...Object.keys(statistic.formats).map((format) => reports_1.convertStatisticToArray(format, statistic.formats[format].total)),
+            reports_1.convertStatisticToArray('Total:', statistic.total)
+        ].map((arr) => arr.join(',')).join('\n');
+        fs_extra_1.ensureDirSync(core_1.getOption('output', this.options));
+        fs_extra_1.writeFileSync(core_1.getOption('output', this.options) + '/jscpd-report.csv', report);
+        console.log(safe_1.green(`CSV report saved to ${path_1.join(this.options.output, 'jscpd-report.csv')}`));
+    }
+}
+exports.CSVReporter = CSVReporter;
+//# sourceMappingURL=csv.js.map
+
+/***/ }),
+
+/***/ 62556:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+function __export(m) {
+    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
+}
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+__export(__nccwpck_require__(94091));
+__export(__nccwpck_require__(32358));
+__export(__nccwpck_require__(61932));
+__export(__nccwpck_require__(42072));
+__export(__nccwpck_require__(35703));
+__export(__nccwpck_require__(49581));
+__export(__nccwpck_require__(40728));
+__export(__nccwpck_require__(44236));
+__export(__nccwpck_require__(60728));
+//# sourceMappingURL=index.js.map
+
+/***/ }),
+
+/***/ 61932:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const fs_extra_1 = __nccwpck_require__(5630);
+const core_1 = __nccwpck_require__(82576);
+const reports_1 = __nccwpck_require__(98065);
+const safe_1 = __nccwpck_require__(41997);
+const path_1 = __nccwpck_require__(71017);
+class JsonReporter {
+    constructor(options) {
+        this.options = options;
+    }
+    generateJson(clones, statistics) {
+        return {
+            statistics,
+            duplicates: clones.map(clone => this.cloneFound(clone))
+        };
+    }
+    report(clones, statistic) {
+        const json = this.generateJson(clones, statistic);
+        fs_extra_1.ensureDirSync(core_1.getOption('output', this.options));
+        fs_extra_1.writeFileSync(core_1.getOption('output', this.options) + '/jscpd-report.json', JSON.stringify(json, null, '  '));
+        console.log(safe_1.green(`JSON report saved to ${path_1.join(this.options.output, 'jscpd-report.json')}`));
+    }
+    cloneFound(clone) {
+        const startLineA = clone.duplicationA.start.line;
+        const endLineA = clone.duplicationA.end.line;
+        const startLineB = clone.duplicationB.start.line;
+        const endLineB = clone.duplicationB.end.line;
+        return {
+            format: clone.format,
+            lines: endLineA - startLineA + 1,
+            fragment: clone.duplicationA.fragment,
+            tokens: 0,
+            firstFile: {
+                name: reports_1.getPath(clone.duplicationA.sourceId, this.options),
+                start: startLineA,
+                end: endLineA,
+                startLoc: clone.duplicationA.start,
+                endLoc: clone.duplicationA.end,
+                blame: clone.duplicationA.blame,
+            },
+            secondFile: {
+                name: reports_1.getPath(clone.duplicationB.sourceId, this.options),
+                start: startLineB,
+                end: endLineB,
+                startLoc: clone.duplicationB.start,
+                endLoc: clone.duplicationB.end,
+                blame: clone.duplicationB.blame,
+            },
+        };
+    }
+}
+exports.JsonReporter = JsonReporter;
+//# sourceMappingURL=json.js.map
+
+/***/ }),
+
+/***/ 35703:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const core_1 = __nccwpck_require__(82576);
+const fs_extra_1 = __nccwpck_require__(5630);
+const safe_1 = __nccwpck_require__(41997);
+const path_1 = __nccwpck_require__(71017);
+const reports_1 = __nccwpck_require__(98065);
+const table = __nccwpck_require__(41062);
+class MarkdownReporter {
+    constructor(options) {
+        this.options = options;
+    }
+    report(clones, statistic) {
+        const report = `
+# Copy/paste detection report
+
+> Duplications detection: Found ${clones.length} exact clones with ${statistic.total.duplicatedLines}(${statistic.total.percentage}%) duplicated lines in ${statistic.total.sources} (${Object.keys(statistic.formats).length} formats) files.
+
+${table([
+            ['Format', 'Files analyzed', 'Total lines', 'Total tokens', 'Clones found', 'Duplicated lines', 'Duplicated tokens'],
+            ...Object.keys(statistic.formats).map((format) => reports_1.convertStatisticToArray(format, statistic.formats[format].total)),
+            reports_1.convertStatisticToArray('Total:', statistic.total).map(item => `**${item}**`)
+        ])}
+`;
+        fs_extra_1.ensureDirSync(core_1.getOption('output', this.options));
+        fs_extra_1.writeFileSync(core_1.getOption('output', this.options) + '/jscpd-report.md', report);
+        console.log(safe_1.green(`Markdown report saved to ${path_1.join(this.options.output, 'jscpd-report.md')}`));
+    }
+}
+exports.MarkdownReporter = MarkdownReporter;
+//# sourceMappingURL=markdown.js.map
+
+/***/ }),
+
+/***/ 40728:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const safe_1 = __nccwpck_require__(41997);
+class SilentReporter {
+    report(clones, statistic) {
+        if (statistic) {
+            console.log(`Duplications detection: Found ${safe_1.bold(clones.length.toString())} ` +
+                `exact clones with ${safe_1.bold(statistic.total.duplicatedLines.toString())}(${statistic.total.percentage}%) ` +
+                `duplicated lines in ${safe_1.bold(statistic.total.sources.toString())} ` +
+                `(${Object.keys(statistic.formats).length} formats) files.`);
+        }
+    }
+}
+exports.SilentReporter = SilentReporter;
+//# sourceMappingURL=silent.js.map
+
+/***/ }),
+
+/***/ 44236:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const safe_1 = __nccwpck_require__(41997);
+class ThresholdReporter {
+    constructor(options) {
+        this.options = options;
+    }
+    report(clones, statistic) {
+        if (statistic && this.options.threshold !== undefined && this.options.threshold < statistic.total.percentage) {
+            const message = `ERROR: jscpd found too many duplicates (${statistic.total.percentage}%) over threshold (${this.options.threshold}%)`;
+            console.error(safe_1.red(message));
+            throw new Error(message);
+        }
+    }
+}
+exports.ThresholdReporter = ThresholdReporter;
+//# sourceMappingURL=threshold.js.map
+
+/***/ }),
+
+/***/ 60728:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const reports_1 = __nccwpck_require__(98065);
+class XcodeReporter {
+    constructor(options) {
+        this.options = options;
+    }
+    report(clones) {
+        clones.forEach((clone) => {
+            this.cloneFound(clone);
+        });
+        console.log(`Found ${clones.length} clones.`);
+    }
+    cloneFound(clone) {
+        const pathA = reports_1.getPath(clone.duplicationA.sourceId, Object.assign(Object.assign({}, this.options), { absolute: true }));
+        const pathB = reports_1.getPath(clone.duplicationB.sourceId, this.options);
+        const startLineA = clone.duplicationA.start.line;
+        const characterA = clone.duplicationA.start.column;
+        const endLineA = clone.duplicationA.end.line;
+        const startLineB = clone.duplicationB.start.line;
+        const endLineB = clone.duplicationB.end.line;
+        console.log(`${pathA}:${startLineA}:${characterA}: warning: Found ${endLineA - startLineA} lines (${startLineA}-${endLineA}) duplicated on file ${pathB} (${startLineB}-${endLineB})`);
+    }
+}
+exports.XcodeReporter = XcodeReporter;
+//# sourceMappingURL=xcode.js.map
+
+/***/ }),
+
+/***/ 49581:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const fs_1 = __nccwpck_require__(57147);
+const fs_extra_1 = __nccwpck_require__(5630);
+const core_1 = __nccwpck_require__(82576);
+const reports_1 = __nccwpck_require__(98065);
+const safe_1 = __nccwpck_require__(41997);
+const path_1 = __nccwpck_require__(71017);
+class XmlReporter {
+    constructor(options) {
+        this.options = options;
+    }
+    report(clones) {
+        let xmlDoc = '<?xml version="1.0" encoding="UTF-8" ?>';
+        xmlDoc += '<pmd-cpd>';
+        clones.forEach((clone) => {
+            xmlDoc = `${xmlDoc}
+      <duplication lines="${clone.duplicationA.end.line - clone.duplicationA.start.line}">
+            <file path="${reports_1.escapeXml(reports_1.getPath(clone.duplicationA.sourceId, this.options))}" line="${clone.duplicationA.start.line}">
+              <codefragment><![CDATA[${clone.duplicationA.fragment.replace(/]]>/i, 'CDATA_END')}]]></codefragment>
+            </file>
+            <file path="${reports_1.escapeXml(reports_1.getPath(clone.duplicationB.sourceId, this.options))}" line="${clone.duplicationB.start.line}">
+              <codefragment><![CDATA[${clone.duplicationB.fragment.replace(/]]>/i, 'CDATA_END')}]]></codefragment>
+            </file>
+            <codefragment><![CDATA[${clone.duplicationA.fragment.replace(/]]>/i, 'CDATA_END')}]]></codefragment>
+        </duplication>
+      `;
+        });
+        xmlDoc += '</pmd-cpd>';
+        fs_extra_1.ensureDirSync(core_1.getOption('output', this.options));
+        fs_1.writeFileSync(core_1.getOption('output', this.options) + '/jscpd-report.xml', xmlDoc);
+        console.log(safe_1.green(`XML report saved to ${path_1.join(this.options.output, 'jscpd-report.xml')}`));
+    }
+}
+exports.XmlReporter = XmlReporter;
+//# sourceMappingURL=xml.js.map
+
+/***/ }),
+
+/***/ 78846:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+function __export(m) {
+    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
+}
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+__export(__nccwpck_require__(67652));
+__export(__nccwpck_require__(67635));
+//# sourceMappingURL=index.js.map
+
+/***/ }),
+
+/***/ 67652:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const clone_found_1 = __nccwpck_require__(31753);
+class ProgressSubscriber {
+    constructor(options) {
+        this.options = options;
+    }
+    subscribe() {
+        return {
+            CLONE_FOUND: (payload) => clone_found_1.cloneFound(payload.clone, this.options),
+        };
+    }
+}
+exports.ProgressSubscriber = ProgressSubscriber;
+//# sourceMappingURL=progress.js.map
+
+/***/ }),
+
+/***/ 67635:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const safe_1 = __nccwpck_require__(41997);
+class VerboseSubscriber {
+    constructor(options) {
+        this.options = options;
+    }
+    subscribe() {
+        return {
+            'CLONE_FOUND': (payload) => {
+                const { clone } = payload;
+                console.log(safe_1.yellow('CLONE_FOUND'));
+                console.log(safe_1.grey(JSON.stringify(clone, null, '\t')));
+            },
+            'CLONE_SKIPPED': (payload) => {
+                const { validation } = payload;
+                console.log(safe_1.yellow('CLONE_SKIPPED'));
+                console.log(safe_1.grey('Clone skipped: ' + validation.message.join(' ')));
+            },
+            'START_DETECTION': (payload) => {
+                const { source } = payload;
+                console.log(safe_1.yellow('START_DETECTION'));
+                console.log(safe_1.grey('Start detection for source id=' + source.getId() + ' format=' + source.getFormat()));
+            },
+        };
+    }
+}
+exports.VerboseSubscriber = VerboseSubscriber;
+//# sourceMappingURL=verbose.js.map
+
+/***/ }),
+
+/***/ 31753:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const safe_1 = __nccwpck_require__(41997);
+const reports_1 = __nccwpck_require__(98065);
+function cloneFound(clone, options) {
+    const { duplicationA, duplicationB, format, isNew } = clone;
+    console.log('Clone found (' + format + '):' + (isNew ? safe_1.red('*') : ''));
+    console.log(` - ${reports_1.getPathConsoleString(duplicationA.sourceId, options)} [${reports_1.getSourceLocation(duplicationA.start, duplicationA.end)}] (${duplicationA.end.line - duplicationA.start.line} lines${duplicationA.end.position ? ', ' + (duplicationA.end.position - duplicationA.start.position) + ' tokens' : ''})`);
+    console.log(`   ${reports_1.getPathConsoleString(duplicationB.sourceId, options)} [${reports_1.getSourceLocation(duplicationB.start, duplicationB.end)}]`);
+    console.log('');
+}
+exports.cloneFound = cloneFound;
+//# sourceMappingURL=clone-found.js.map
+
+/***/ }),
+
+/***/ 10206:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+function parseFormatsExtensions(extensions = '') {
+    const result = {};
+    if (!extensions) {
+        return undefined;
+    }
+    extensions.split(';').forEach((format) => {
+        const pair = format.split(':');
+        result[pair[0]] = pair[1].split(',');
+    });
+    return result;
+}
+exports.parseFormatsExtensions = parseFormatsExtensions;
+//# sourceMappingURL=options.js.map
+
+/***/ }),
+
+/***/ 98065:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const path_1 = __nccwpck_require__(71017);
+const process_1 = __nccwpck_require__(77282);
+const safe_1 = __nccwpck_require__(41997);
+exports.compareDates = (firstDate, secondDate) => {
+    const first = new Date(firstDate);
+    const second = new Date(secondDate);
+    switch (true) {
+        case first < second:
+            return '=>';
+        case first > second:
+            return '<=';
+        default:
+            return '==';
+    }
+};
+function escapeXml(unsafe) {
+    return unsafe.replace(/[<>&'"]/g, function (c) {
+        switch (c) {
+            case '<': return '&lt;';
+            case '>': return '&gt;';
+            case '&': return '&amp;';
+            case '\'': return '&apos;';
+            case '"': return '&quot;';
+        }
+    });
+}
+exports.escapeXml = escapeXml;
+function getPath(path, options) {
+    return options.absolute ? path : path_1.relative(process_1.cwd(), path);
+}
+exports.getPath = getPath;
+function getPathConsoleString(path, options) {
+    return safe_1.bold(safe_1.green(getPath(path, options)));
+}
+exports.getPathConsoleString = getPathConsoleString;
+function getSourceLocation(start, end) {
+    return `${start.line}:${start.column} - ${end.line}:${end.column}`;
+}
+exports.getSourceLocation = getSourceLocation;
+function generateLine(clone, position, line) {
+    const lineNumberA = (clone.duplicationA.start.line + position).toString();
+    const lineNumberB = (clone.duplicationB.start.line + position).toString();
+    if (clone.duplicationA.blame && clone.duplicationB.blame) {
+        return [
+            lineNumberA,
+            clone.duplicationA.blame[lineNumberA] ? clone.duplicationA.blame[lineNumberA].author : '',
+            clone.duplicationA.blame[lineNumberA] && clone.duplicationB.blame[lineNumberB]
+                ? exports.compareDates(clone.duplicationA.blame[lineNumberA].date, clone.duplicationB.blame[lineNumberB].date)
+                : '',
+            lineNumberB,
+            clone.duplicationB.blame[lineNumberB] ? clone.duplicationB.blame[lineNumberB].author : '',
+            safe_1.grey(line),
+        ];
+    }
+    else {
+        return [lineNumberA, lineNumberB, safe_1.grey(line)];
+    }
+}
+exports.generateLine = generateLine;
+function convertStatisticToArray(format, statistic) {
+    return [
+        format,
+        `${statistic.sources}`,
+        `${statistic.lines}`,
+        `${statistic.tokens}`,
+        `${statistic.clones}`,
+        `${statistic.duplicatedLines} (${statistic.percentage}%)`,
+        `${statistic.duplicatedTokens} (${statistic.percentageTokens}%)`,
+    ];
+}
+exports.convertStatisticToArray = convertStatisticToArray;
+//# sourceMappingURL=reports.js.map
+
+/***/ }),
+
+/***/ 28758:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+function __export(m) {
+    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
+}
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+__export(__nccwpck_require__(85254));
+//# sourceMappingURL=index.js.map
+
+/***/ }),
+
+/***/ 85254:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const core_1 = __nccwpck_require__(82576);
+const path_1 = __nccwpck_require__(71017);
+class SkipLocalValidator {
+    validate(clone, options) {
+        const status = !this.shouldSkipClone(clone, options);
+        return {
+            status,
+            clone,
+            message: [
+                `Sources of duplication located in same local folder (${clone.duplicationA.sourceId}, ${clone.duplicationB.sourceId})`
+            ]
+        };
+    }
+    shouldSkipClone(clone, options) {
+        const path = core_1.getOption('path', options);
+        return path.some((dir) => SkipLocalValidator.isRelative(clone.duplicationA.sourceId, dir) && SkipLocalValidator.isRelative(clone.duplicationB.sourceId, dir));
+    }
+    static isRelative(file, path) {
+        const rel = path_1.relative(path, file);
+        return rel !== '' && !rel.startsWith('..') && !path_1.isAbsolute(rel);
+    }
+}
+exports.SkipLocalValidator = SkipLocalValidator;
+//# sourceMappingURL=skip-local.validator.js.map
+
+/***/ }),
+
+/***/ 24953:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const path_1 = __nccwpck_require__(71017);
+exports.FORMATS = {
+    abap: {
+        exts: [],
+    },
+    actionscript: {
+        exts: ['as'],
+    },
+    ada: {
+        exts: ['ada'],
+    },
+    apacheconf: {
+        exts: [],
+    },
+    apl: {
+        exts: ['apl'],
+    },
+    applescript: {
+        exts: [],
+    },
+    arduino: {
+        exts: [],
+    },
+    arff: {
+        exts: [],
+    },
+    asciidoc: {
+        exts: [],
+    },
+    asm6502: {
+        exts: [],
+    },
+    aspnet: {
+        exts: ['asp', 'aspx'],
+    },
+    autohotkey: {
+        exts: [],
+    },
+    autoit: {
+        exts: [],
+    },
+    bash: {
+        exts: ['sh', 'ksh', 'bash'],
+    },
+    basic: {
+        exts: ['bas'],
+    },
+    batch: {
+        exts: [],
+    },
+    bison: {
+        exts: [],
+    },
+    brainfuck: {
+        exts: ['b', 'bf'],
+    },
+    bro: {
+        exts: [],
+    },
+    c: {
+        exts: ['c', 'z80'],
+    },
+    'c-header': {
+        exts: ['h'],
+        parent: 'c',
+    },
+    clike: {
+        exts: [],
+    },
+    clojure: {
+        exts: ['cljs', 'clj', 'cljc', 'cljx', 'edn'],
+    },
+    coffeescript: {
+        exts: ['coffee'],
+    },
+    comments: {
+        exts: []
+    },
+    cpp: {
+        exts: ['cpp', 'c++', 'cc', 'cxx'],
+    },
+    'cpp-header': {
+        exts: ['hpp', 'h++', 'hh', 'hxx'],
+        parent: 'cpp',
+    },
+    crystal: {
+        exts: ['cr'],
+    },
+    csharp: {
+        exts: ['cs'],
+    },
+    csp: {
+        exts: [],
+    },
+    'css-extras': {
+        exts: [],
+    },
+    css: {
+        exts: ['css', 'gss'],
+    },
+    d: {
+        exts: ['d'],
+    },
+    dart: {
+        exts: ['dart'],
+    },
+    diff: {
+        exts: ['diff', 'patch'],
+    },
+    django: {
+        exts: [],
+    },
+    docker: {
+        exts: [],
+    },
+    eiffel: {
+        exts: ['e'],
+    },
+    elixir: {
+        exts: [],
+    },
+    elm: {
+        exts: ['elm'],
+    },
+    erb: {
+        exts: [],
+    },
+    erlang: {
+        exts: ['erl', 'erlang'],
+    },
+    flow: {
+        exts: [],
+    },
+    fortran: {
+        exts: ['f', 'for', 'f77', 'f90'],
+    },
+    fsharp: {
+        exts: ['fs'],
+    },
+    gedcom: {
+        exts: [],
+    },
+    gherkin: {
+        exts: ['feature'],
+    },
+    git: {
+        exts: [],
+    },
+    glsl: {
+        exts: [],
+    },
+    go: {
+        exts: ['go'],
+    },
+    graphql: {
+        exts: ['graphql'],
+    },
+    groovy: {
+        exts: ['groovy', 'gradle'],
+    },
+    haml: {
+        exts: ['haml'],
+    },
+    handlebars: {
+        exts: ['hb', 'hbs', 'handlebars'],
+    },
+    haskell: {
+        exts: ['hs', 'lhs '],
+    },
+    haxe: {
+        exts: ['hx', 'hxml'],
+    },
+    hpkp: {
+        exts: [],
+    },
+    hsts: {
+        exts: [],
+    },
+    http: {
+        exts: [],
+    },
+    ichigojam: {
+        exts: [],
+    },
+    icon: {
+        exts: [],
+    },
+    inform7: {
+        exts: [],
+    },
+    ini: {
+        exts: ['ini'],
+    },
+    io: {
+        exts: [],
+    },
+    j: {
+        exts: [],
+    },
+    java: {
+        exts: ['java'],
+    },
+    javascript: {
+        exts: ['js', 'es', 'es6'],
+    },
+    jolie: {
+        exts: [],
+    },
+    json: {
+        exts: ['json', 'map', 'jsonld'],
+    },
+    jsx: {
+        exts: ['jsx'],
+    },
+    julia: {
+        exts: ['jl'],
+    },
+    keymap: {
+        exts: [],
+    },
+    kotlin: {
+        exts: ['kt', 'kts'],
+    },
+    latex: {
+        exts: ['tex'],
+    },
+    less: {
+        exts: ['less'],
+    },
+    liquid: {
+        exts: [],
+    },
+    lisp: {
+        exts: ['cl', 'lisp', 'el'],
+    },
+    livescript: {
+        exts: ['ls'],
+    },
+    lolcode: {
+        exts: [],
+    },
+    lua: {
+        exts: ['lua'],
+    },
+    makefile: {
+        exts: [],
+    },
+    markdown: {
+        exts: ['md', 'markdown', 'mkd', 'txt'],
+    },
+    markup: {
+        exts: ['html', 'htm', 'xml', 'xsl', 'xslt', 'svg', 'vue', 'ejs', 'jsp'],
+    },
+    matlab: {
+        exts: [],
+    },
+    mel: {
+        exts: [],
+    },
+    mizar: {
+        exts: [],
+    },
+    monkey: {
+        exts: [],
+    },
+    n4js: {
+        exts: [],
+    },
+    nasm: {
+        exts: [],
+    },
+    nginx: {
+        exts: [],
+    },
+    nim: {
+        exts: [],
+    },
+    nix: {
+        exts: [],
+    },
+    nsis: {
+        exts: ['nsh', 'nsi'],
+    },
+    objectivec: {
+        exts: ['m', 'mm'],
+    },
+    ocaml: {
+        exts: ['ocaml', 'ml', 'mli', 'mll', 'mly'],
+    },
+    opencl: {
+        exts: [],
+    },
+    oz: {
+        exts: ['oz'],
+    },
+    parigp: {
+        exts: [],
+    },
+    pascal: {
+        exts: ['pas', 'p'],
+    },
+    perl: {
+        exts: ['pl', 'pm'],
+    },
+    php: {
+        exts: ['php', 'phtml'],
+    },
+    plsql: {
+        exts: ['plsql'],
+    },
+    powershell: {
+        exts: ['ps1', 'psd1', 'psm1'],
+    },
+    processing: {
+        exts: [],
+    },
+    prolog: {
+        exts: ['pro'],
+    },
+    properties: {
+        exts: ['properties'],
+    },
+    protobuf: {
+        exts: ['proto'],
+    },
+    pug: {
+        exts: ['pug', 'jade'],
+    },
+    puppet: {
+        exts: ['pp', 'puppet'],
+    },
+    pure: {
+        exts: [],
+    },
+    python: {
+        exts: ['py', 'pyx', 'pxd', 'pxi'],
+    },
+    q: {
+        exts: ['q'],
+    },
+    qore: {
+        exts: [],
+    },
+    r: {
+        exts: ['r', 'R'],
+    },
+    reason: {
+        exts: [],
+    },
+    renpy: {
+        exts: [],
+    },
+    rest: {
+        exts: [],
+    },
+    rip: {
+        exts: [],
+    },
+    roboconf: {
+        exts: [],
+    },
+    ruby: {
+        exts: ['rb'],
+    },
+    rust: {
+        exts: ['rs'],
+    },
+    sas: {
+        exts: ['sas'],
+    },
+    sass: {
+        exts: ['sass'],
+    },
+    scala: {
+        exts: ['scala'],
+    },
+    scheme: {
+        exts: ['scm', 'ss'],
+    },
+    scss: {
+        exts: ['scss'],
+    },
+    smalltalk: {
+        exts: ['st'],
+    },
+    smarty: {
+        exts: ['smarty', 'tpl'],
+    },
+    soy: {
+        exts: ['soy'],
+    },
+    sql: {
+        exts: ['sql', 'cql'],
+    },
+    stylus: {
+        exts: ['styl', 'stylus'],
+    },
+    swift: {
+        exts: ['swift'],
+    },
+    tap: {
+        exts: ['tap'],
+    },
+    tcl: {
+        exts: ['tcl'],
+    },
+    textile: {
+        exts: ['textile'],
+    },
+    tsx: {
+        exts: ['tsx'],
+    },
+    tt2: {
+        exts: ['tt2'],
+    },
+    twig: {
+        exts: ['twig'],
+    },
+    typescript: {
+        exts: ['ts'],
+    },
+    vbnet: {
+        exts: ['vb'],
+    },
+    velocity: {
+        exts: ['vtl'],
+    },
+    verilog: {
+        exts: ['v'],
+    },
+    vhdl: {
+        exts: ['vhd', 'vhdl'],
+    },
+    vim: {
+        exts: [],
+    },
+    'visual-basic': {
+        exts: ['vb'],
+    },
+    wasm: {
+        exts: [],
+    },
+    url: {
+        exts: [],
+    },
+    wiki: {
+        exts: [],
+    },
+    xeora: {
+        exts: [],
+    },
+    xojo: {
+        exts: [],
+    },
+    xquery: {
+        exts: ['xy', 'xquery'],
+    },
+    yaml: {
+        exts: ['yaml', 'yml'],
+    },
+};
+function getSupportedFormats() {
+    return Object.keys(exports.FORMATS).filter((name) => name !== 'important' && name !== 'url');
+}
+exports.getSupportedFormats = getSupportedFormats;
+function getFormatByFile(path, formatsExts) {
+    const ext = path_1.extname(path).slice(1);
+    if (formatsExts && Object.keys(formatsExts).length) {
+        return Object.keys(formatsExts).find((format) => formatsExts[format].includes(ext));
+    }
+    return Object.keys(exports.FORMATS).find((language) => exports.FORMATS[language].exts.includes(ext));
+}
+exports.getFormatByFile = getFormatByFile;
+//# sourceMappingURL=formats.js.map
+
+/***/ }),
+
+/***/ 57230:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const reprism = __nccwpck_require__(18042);
+const abap = __nccwpck_require__(65444);
+const actionscript = __nccwpck_require__(21019);
+const ada = __nccwpck_require__(99040);
+const apacheconf = __nccwpck_require__(70629);
+const apl = __nccwpck_require__(13529);
+const applescript = __nccwpck_require__(95394);
+const arff = __nccwpck_require__(56245);
+const asciidoc = __nccwpck_require__(86002);
+const asm6502 = __nccwpck_require__(68737);
+const aspnet = __nccwpck_require__(16326);
+const autohotkey = __nccwpck_require__(3183);
+const autoit = __nccwpck_require__(41502);
+const bash = __nccwpck_require__(15209);
+const basic = __nccwpck_require__(46676);
+const batch = __nccwpck_require__(20986);
+const brainfuck = __nccwpck_require__(64636);
+const bro = __nccwpck_require__(57206);
+const c = __nccwpck_require__(98220);
+const clike = __nccwpck_require__(17403);
+const clojure = __nccwpck_require__(45685);
+const coffeescript = __nccwpck_require__(20525);
+const cpp = __nccwpck_require__(26433);
+const csharp = __nccwpck_require__(3204);
+const csp = __nccwpck_require__(12115);
+const cssExtras = __nccwpck_require__(16590);
+const css = __nccwpck_require__(58302);
+const d = __nccwpck_require__(60310);
+const dart = __nccwpck_require__(14572);
+const diff = __nccwpck_require__(35844);
+const django = __nccwpck_require__(97535);
+const docker = __nccwpck_require__(94508);
+const eiffel = __nccwpck_require__(79209);
+const elixir = __nccwpck_require__(74952);
+const erlang = __nccwpck_require__(15691);
+const flow = __nccwpck_require__(53794);
+const fortran = __nccwpck_require__(90374);
+const fsharp = __nccwpck_require__(63354);
+const gedcom = __nccwpck_require__(25605);
+const gherkin = __nccwpck_require__(14194);
+const git = __nccwpck_require__(96602);
+const glsl = __nccwpck_require__(96860);
+const go = __nccwpck_require__(96509);
+const graphql = __nccwpck_require__(6219);
+const groovy = __nccwpck_require__(90897);
+const haml = __nccwpck_require__(33412);
+const handlebars = __nccwpck_require__(62023);
+const haskell = __nccwpck_require__(2524);
+const haxe = __nccwpck_require__(7267);
+const hpkp = __nccwpck_require__(358);
+const hsts = __nccwpck_require__(42669);
+const http = __nccwpck_require__(7378);
+const ichigojam = __nccwpck_require__(79406);
+const icon = __nccwpck_require__(87849);
+const inform7 = __nccwpck_require__(63411);
+const ini = __nccwpck_require__(49597);
+const io = __nccwpck_require__(28985);
+const j = __nccwpck_require__(83738);
+const java = __nccwpck_require__(47998);
+const javascript = __nccwpck_require__(48430);
+const jolie = __nccwpck_require__(37234);
+const json = __nccwpck_require__(96317);
+const jsx = __nccwpck_require__(16054);
+const julia = __nccwpck_require__(18521);
+const keyman = __nccwpck_require__(1453);
+const kotlin = __nccwpck_require__(69707);
+const latex = __nccwpck_require__(78387);
+const less = __nccwpck_require__(25526);
+const liquid = __nccwpck_require__(110);
+const lisp = __nccwpck_require__(5716);
+const livescript = __nccwpck_require__(4273);
+const lolcode = __nccwpck_require__(78908);
+const lua = __nccwpck_require__(28482);
+const makefile = __nccwpck_require__(65822);
+const markdown = __nccwpck_require__(20518);
+const markupTemplating = __nccwpck_require__(8914);
+const markup = __nccwpck_require__(42152);
+const matlab = __nccwpck_require__(21372);
+const mel = __nccwpck_require__(19177);
+const mizar = __nccwpck_require__(37457);
+const monkey = __nccwpck_require__(26314);
+const n4js = __nccwpck_require__(41630);
+const nasm = __nccwpck_require__(57062);
+const nginx = __nccwpck_require__(44909);
+const nim = __nccwpck_require__(64441);
+const nix = __nccwpck_require__(51758);
+const nsis = __nccwpck_require__(47159);
+const objectivec = __nccwpck_require__(41466);
+const ocaml = __nccwpck_require__(20505);
+const opencl = __nccwpck_require__(24484);
+const oz = __nccwpck_require__(70834);
+const parigp = __nccwpck_require__(29775);
+const parser = __nccwpck_require__(28480);
+const pascal = __nccwpck_require__(98305);
+const perl = __nccwpck_require__(46306);
+const phpExtras = __nccwpck_require__(78800);
+const php = __nccwpck_require__(92619);
+const powershell = __nccwpck_require__(31896);
+const processing = __nccwpck_require__(63028);
+const prolog = __nccwpck_require__(11831);
+const properties = __nccwpck_require__(6971);
+const protobuf = __nccwpck_require__(9802);
+const pug = __nccwpck_require__(47602);
+const puppet = __nccwpck_require__(16015);
+const pure = __nccwpck_require__(96047);
+const python = __nccwpck_require__(42212);
+const q = __nccwpck_require__(70061);
+const qore = __nccwpck_require__(97631);
+const r = __nccwpck_require__(20420);
+const reason = __nccwpck_require__(39443);
+const renpy = __nccwpck_require__(48755);
+const rest = __nccwpck_require__(57652);
+const rip = __nccwpck_require__(11090);
+const roboconf = __nccwpck_require__(72149);
+const ruby = __nccwpck_require__(40415);
+const rust = __nccwpck_require__(93399);
+const sas = __nccwpck_require__(96939);
+const sass = __nccwpck_require__(37650);
+const scala = __nccwpck_require__(60988);
+const scheme = __nccwpck_require__(14150);
+const scss = __nccwpck_require__(56838);
+const smalltalk = __nccwpck_require__(81200);
+const smarty = __nccwpck_require__(94171);
+const soy = __nccwpck_require__(89135);
+const stylus = __nccwpck_require__(94920);
+const swift = __nccwpck_require__(58479);
+const tcl = __nccwpck_require__(59758);
+const textile = __nccwpck_require__(38347);
+const tsx = __nccwpck_require__(13220);
+const twig = __nccwpck_require__(99323);
+const typescript = __nccwpck_require__(148);
+const vbnet = __nccwpck_require__(15305);
+const velocity = __nccwpck_require__(16657);
+const verilog = __nccwpck_require__(26734);
+const vhdl = __nccwpck_require__(19450);
+const vim = __nccwpck_require__(38565);
+const visualBasic = __nccwpck_require__(58229);
+const wasm = __nccwpck_require__(63735);
+const wiki = __nccwpck_require__(9213);
+const xeora = __nccwpck_require__(93867);
+const xojo = __nccwpck_require__(81975);
+const yaml = __nccwpck_require__(54163);
+const tap = __nccwpck_require__(41280);
+const sql = __nccwpck_require__(71439);
+const plsql = __nccwpck_require__(71352);
+exports.languages = {
+    abap, actionscript, ada, apacheconf, apl, applescript, arff,
+    asciidoc, asm6502, aspnet, autohotkey, autoit, bash, basic, batch,
+    brainfuck, bro, c, clike, clojure, coffeescript, cpp, csharp, csp, cssExtras,
+    css, d, dart, diff, django, docker, eiffel, elixir, erlang, flow, fortran, fsharp,
+    gedcom, gherkin, git, glsl, go, graphql, groovy, haml, handlebars, haskell, haxe,
+    hpkp, hsts, http, ichigojam, icon, inform7, ini, io, j, java, javascript, jolie,
+    json, jsx, julia, keyman, kotlin, latex, less, liquid, lisp, livescript,
+    lolcode, lua, makefile, markdown, markupTemplating, markup, matlab, mel, mizar,
+    monkey, n4js, nasm, nginx, nim, nix, nsis, objectivec, ocaml, opencl, oz, parigp,
+    parser, pascal, perl, php, phpExtras, powershell, processing, prolog,
+    properties, protobuf, pug, puppet, pure, python, q, qore, r, reason, renpy, rest,
+    rip, roboconf, ruby, rust, sas, sass, scala, scheme, scss, smalltalk, smarty, soy,
+    stylus, swift, tcl, textile, twig, typescript, vbnet, velocity, verilog, vhdl,
+    vim, visualBasic, wasm, wiki, xeora, xojo, yaml, tsx, sql, plsql, tap
+};
+exports.loadLanguages = () => {
+    reprism.loadLanguages(Object.values(exports.languages).map(v => v.default));
+};
+//# sourceMappingURL=grammar-loader.js.map
+
+/***/ }),
+
+/***/ 93175:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const SparkMD5 = __nccwpck_require__(70220);
+function hash(value) {
+    return SparkMD5.hash(value);
+}
+exports.hash = hash;
+//# sourceMappingURL=hash.js.map
+
+/***/ }),
+
+/***/ 1551:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+function __export(m) {
+    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
+}
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const tokenize_1 = __nccwpck_require__(74092);
+__export(__nccwpck_require__(74092));
+__export(__nccwpck_require__(73303));
+__export(__nccwpck_require__(24953));
+class Tokenizer {
+    generateMaps(id, data, format, options) {
+        return tokenize_1.createTokenMapBasedOnCode(id, data, format, options);
+    }
+}
+exports.Tokenizer = Tokenizer;
+//# sourceMappingURL=index.js.map
+
+/***/ }),
+
+/***/ 71352:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const grammar = {
+    language: 'plsql',
+    init(Prism) {
+        Prism.languages.plsql = Prism.languages.extend('sql', {
+            comment: [/\/\*[\s\S]*?\*\//, /--.*/],
+        });
+        if (Prism.util.type(Prism.languages.plsql.keyword) !== 'Array') {
+            Prism.languages.plsql.keyword = [Prism.languages.plsql.keyword];
+        }
+        Prism.languages.plsql.keyword.unshift(/\b(?:ACCESS|AGENT|AGGREGATE|ARRAY|ARROW|AT|ATTRIBUTE|AUDIT|AUTHID|BFILE_BASE|BLOB_BASE|BLOCK|BODY|BOTH|BOUND|BYTE|CALLING|CHAR_BASE|CHARSET(?:FORM|ID)|CLOB_BASE|COLAUTH|COLLECT|CLUSTERS?|COMPILED|COMPRESS|CONSTANT|CONSTRUCTOR|CONTEXT|CRASH|CUSTOMDATUM|DANGLING|DATE_BASE|DEFINE|DETERMINISTIC|DURATION|ELEMENT|EMPTY|EXCEPTIONS?|EXCLUSIVE|EXTERNAL|FINAL|FORALL|FORM|FOUND|GENERAL|HEAP|HIDDEN|IDENTIFIED|IMMEDIATE|INCLUDING|INCREMENT|INDICATOR|INDEXES|INDICES|INFINITE|INITIAL|ISOPEN|INSTANTIABLE|INTERFACE|INVALIDATE|JAVA|LARGE|LEADING|LENGTH|LIBRARY|LIKE[24C]|LIMITED|LONG|LOOP|MAP|MAXEXTENTS|MAXLEN|MEMBER|MINUS|MLSLABEL|MULTISET|NAME|NAN|NATIVE|NEW|NOAUDIT|NOCOMPRESS|NOCOPY|NOTFOUND|NOWAIT|NUMBER(?:_BASE)?|OBJECT|OCI(?:COLL|DATE|DATETIME|DURATION|INTERVAL|LOBLOCATOR|NUMBER|RAW|REF|REFCURSOR|ROWID|STRING|TYPE)|OFFLINE|ONLINE|ONLY|OPAQUE|OPERATOR|ORACLE|ORADATA|ORGANIZATION|ORL(?:ANY|VARY)|OTHERS|OVERLAPS|OVERRIDING|PACKAGE|PARALLEL_ENABLE|PARAMETERS?|PASCAL|PCTFREE|PIPE(?:LINED)?|PRAGMA|PRIOR|PRIVATE|RAISE|RANGE|RAW|RECORD|REF|REFERENCE|REM|REMAINDER|RESULT|RESOURCE|RETURNING|REVERSE|ROW(?:ID|NUM|TYPE)|SAMPLE|SB[124]|SEGMENT|SELF|SEPARATE|SEQUENCE|SHORT|SIZE(?:_T)?|SPARSE|SQL(?:CODE|DATA|NAME|STATE)|STANDARD|STATIC|STDDEV|STORED|STRING|STRUCT|STYLE|SUBMULTISET|SUBPARTITION|SUBSTITUTABLE|SUBTYPE|SUCCESSFUL|SYNONYM|SYSDATE|TABAUTH|TDO|THE|TIMEZONE_(?:ABBR|HOUR|MINUTE|REGION)|TRAILING|TRANSAC(?:TIONAL)?|TRUSTED|UB[124]|UID|UNDER|UNTRUSTED|VALIDATE|VALIST|VARCHAR2|VARIABLE|VARIANCE|VARRAY|VIEWS|VOID|WHENEVER|WRAPPED|ZONE)\b/i);
+        if (Prism.util.type(Prism.languages.plsql.operator) !== 'Array') {
+            Prism.languages.plsql.operator = [Prism.languages.plsql.operator];
+        }
+        Prism.languages.plsql.operator.unshift(/:=/);
+    },
+};
+exports["default"] = grammar;
+//# sourceMappingURL=plsql.js.map
+
+/***/ }),
+
+/***/ 71439:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const grammar = {
+    language: 'sql',
+    init(Prism) {
+        Prism.languages.sql = {
+            'comment': {
+                pattern: /(^|[^\\])(?:\/\*[\s\S]*?\*\/|(?:--|\/\/|#).*)/,
+                lookbehind: true,
+            },
+            'variable': [
+                {
+                    pattern: /@(["'`])(?:\\[\s\S]|(?!\1)[^\\])+\1/,
+                    greedy: true,
+                },
+                /@[\w.$]+/,
+            ],
+            'string': {
+                pattern: /(^|[^@\\])("|')(?:\\[\s\S]|(?!\2)[^\\]|\2\2)*\2/,
+                greedy: true,
+                lookbehind: true,
+            },
+            'function': /\b(?:AVG|COUNT|FIRST|FORMAT|LAST|LCASE|LEN|MAX|MID|MIN|MOD|NOW|ROUND|SUM|UCASE)(?=\s*\()/i,
+            'keyword': /\b(?:ACTION|ADD|AFTER|ALGORITHM|ALL|ALTER|ANALYZE|ANY|APPLY|AS|ASC|AUTHORIZATION|AUTO_INCREMENT|BACKUP|BDB|BEGIN|BERKELEYDB|BIGINT|BINARY|BIT|BLOB|BOOL|BOOLEAN|BREAK|BROWSE|BTREE|BULK|BY|CALL|CASCADED?|CASE|CHAIN|CHAR(?:ACTER|SET)?|CHECK(?:POINT)?|CLOSE|CLUSTERED|COALESCE|COLLATE|COLUMNS?|COMMENT|COMMIT(?:TED)?|COMPUTE|CONNECT|CONSISTENT|CONSTRAINT|CONTAINS(?:TABLE)?|CONTINUE|CONVERT|CREATE|CROSS|CURRENT(?:_DATE|_TIME|_TIMESTAMP|_USER)?|CURSOR|CYCLE|DATA(?:BASES?)?|DATE(?:TIME)?|DAY|DBCC|DEALLOCATE|DEC|DECIMAL|DECLARE|DEFAULT|DEFINER|DELAYED|DELETE|DELIMITERS?|DENY|DESC|DESCRIBE|DETERMINISTIC|DISABLE|DISCARD|DISK|DISTINCT|DISTINCTROW|DISTRIBUTED|DO|DOUBLE|DROP|DUMMY|DUMP(?:FILE)?|DUPLICATE|ELSE(?:IF)?|ENABLE|ENCLOSED|END|ENGINE|ENUM|ERRLVL|ERRORS|ESCAPED?|EXCEPT|EXEC(?:UTE)?|EXISTS|EXIT|EXPLAIN|EXTENDED|FETCH|FIELDS|FILE|FILLFACTOR|FIRST|FIXED|FLOAT|FOLLOWING|FOR(?: EACH ROW)?|FORCE|FOREIGN|FREETEXT(?:TABLE)?|FROM|FULL|FUNCTION|GEOMETRY(?:COLLECTION)?|GLOBAL|GOTO|GRANT|GROUP|HANDLER|HASH|HAVING|HOLDLOCK|HOUR|IDENTITY(?:_INSERT|COL)?|IF|IGNORE|IMPORT|INDEX|INFILE|INNER|INNODB|INOUT|INSERT|INT|INTEGER|INTERSECT|INTERVAL|INTO|INVOKER|ISOLATION|ITERATE|JOIN|KEYS?|KILL|LANGUAGE|LAST|LEAVE|LEFT|LEVEL|LIMIT|LINENO|LINES|LINESTRING|LOAD|LOCAL|LOCK|LONG(?:BLOB|TEXT)|LOOP|MATCH(?:ED)?|MEDIUM(?:BLOB|INT|TEXT)|MERGE|MIDDLEINT|MINUTE|MODE|MODIFIES|MODIFY|MONTH|MULTI(?:LINESTRING|POINT|POLYGON)|NATIONAL|NATURAL|NCHAR|NEXT|NO|NONCLUSTERED|NULLIF|NUMERIC|OFF?|OFFSETS?|ON|OPEN(?:DATASOURCE|QUERY|ROWSET)?|OPTIMIZE|OPTION(?:ALLY)?|ORDER|OUT(?:ER|FILE)?|OVER|PARTIAL|PARTITION|PERCENT|PIVOT|PLAN|POINT|POLYGON|PRECEDING|PRECISION|PREPARE|PREV|PRIMARY|PRINT|PRIVILEGES|PROC(?:EDURE)?|PUBLIC|PURGE|QUICK|RAISERROR|READS?|REAL|RECONFIGURE|REFERENCES|RELEASE|RENAME|REPEAT(?:ABLE)?|REPLACE|REPLICATION|REQUIRE|RESIGNAL|RESTORE|RESTRICT|RETURNS?|REVOKE|RIGHT|ROLLBACK|ROUTINE|ROW(?:COUNT|GUIDCOL|S)?|RTREE|RULE|SAVE(?:POINT)?|SCHEMA|SECOND|SELECT|SERIAL(?:IZABLE)?|SESSION(?:_USER)?|SET(?:USER)?|SHARE|SHOW|SHUTDOWN|SIMPLE|SMALLINT|SNAPSHOT|SOME|SONAME|SQL|START(?:ING)?|STATISTICS|STATUS|STRIPED|SYSTEM_USER|TABLES?|TABLESPACE|TEMP(?:ORARY|TABLE)?|TERMINATED|TEXT(?:SIZE)?|THEN|TIME(?:STAMP)?|TINY(?:BLOB|INT|TEXT)|TOP?|TRAN(?:SACTIONS?)?|TRIGGER|TRUNCATE|TSEQUAL|TYPES?|UNBOUNDED|UNCOMMITTED|UNDEFINED|UNION|UNIQUE|UNLOCK|UNPIVOT|UNSIGNED|UPDATE(?:TEXT)?|USAGE|USE|USER|USING|VALUES?|VAR(?:BINARY|CHAR|CHARACTER|YING)|VIEW|WAITFOR|WARNINGS|WHEN|WHERE|WHILE|WITH(?: ROLLUP|IN)?|WORK|WRITE(?:TEXT)?|YEAR)\b/i,
+            'boolean': /\b(?:TRUE|FALSE|NULL)\b/i,
+            'number': /\b0x[\da-f]+\b|\b\d+\.?\d*|\B\.\d+\b/i,
+            'operator': /[-+*\/=%^~]|&&?|\|\|?|!=?|<(?:=>?|<|>)?|>[>=]?|\b(?:AND|BETWEEN|IN|LIKE|NOT|OR|IS|DIV|REGEXP|RLIKE|SOUNDS LIKE|XOR)\b/i,
+            'punctuation': /[;[\]()`,.]/,
+        };
+    },
+};
+exports["default"] = grammar;
+//# sourceMappingURL=sql.js.map
+
+/***/ }),
+
+/***/ 41280:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const grammar = {
+    language: 'tap',
+    init(Prism) {
+        Prism.languages.tap = {
+            fail: /not ok[^#{\n\r]*/,
+            pass: /ok[^#{\n\r]*/,
+            pragma: /pragma [+-][a-z]+/,
+            bailout: /bail out!.*/i,
+            version: /TAP version \d+/i,
+            plan: /\d+\.\.\d+(?: +#.*)?/,
+            subtest: {
+                pattern: /# Subtest(?:: .*)?/,
+                greedy: true
+            },
+            punctuation: /[{}]/,
+            directive: /#.*/,
+            yamlish: {
+                pattern: /(^[ \t]*)---[\s\S]*?[\r\n][ \t]*\.\.\.$/m,
+                lookbehind: true,
+                inside: Prism.languages.yaml,
+                alias: 'language-yaml'
+            }
+        };
+    },
+};
+exports["default"] = grammar;
+//# sourceMappingURL=tap.js.map
+
+/***/ }),
+
+/***/ 73303:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const hash_1 = __nccwpck_require__(93175);
+const TOKEN_HASH_LENGTH = 20;
+function createTokenHash(token, hashFunction = undefined) {
+    return hashFunction ?
+        hashFunction(token.type + token.value).substr(0, TOKEN_HASH_LENGTH) :
+        hash_1.hash(token.type + token.value).substr(0, TOKEN_HASH_LENGTH);
+}
+function groupByFormat(tokens) {
+    const result = {};
+    // TODO change to reduce
+    tokens.forEach((token) => {
+        (result[token.format] = result[token.format] ? [...result[token.format], token] : [token]);
+    });
+    return result;
+}
+class TokensMap {
+    constructor(id, data, tokens, format, options) {
+        this.id = id;
+        this.data = data;
+        this.tokens = tokens;
+        this.format = format;
+        this.options = options;
+        this.position = 0;
+        this.hashMap = this.tokens.map((token) => {
+            if (options.ignoreCase) {
+                token.value = token.value.toLocaleLowerCase();
+            }
+            return createTokenHash(token, this.options.hashFunction);
+        }).join('');
+    }
+    getTokensCount() {
+        return this.tokens[this.tokens.length - 1].loc.end.position - this.tokens[0].loc.start.position;
+    }
+    getId() {
+        return this.id;
+    }
+    getLinesCount() {
+        return this.tokens[this.tokens.length - 1].loc.end.line - this.tokens[0].loc.start.line;
+    }
+    getFormat() {
+        return this.format;
+    }
+    [Symbol.iterator]() {
+        return this;
+    }
+    next() {
+        const hashFunction = this.options.hashFunction ? this.options.hashFunction : hash_1.hash;
+        const mapFrame = hashFunction(this.hashMap.substring(this.position * TOKEN_HASH_LENGTH, this.position * TOKEN_HASH_LENGTH + this.options.minTokens * TOKEN_HASH_LENGTH)).substring(0, TOKEN_HASH_LENGTH);
+        if (this.position < this.tokens.length - this.options.minTokens) {
+            this.position++;
+            return {
+                done: false,
+                value: {
+                    id: mapFrame,
+                    sourceId: this.getId(),
+                    start: this.tokens[this.position - 1],
+                    end: this.tokens[this.position + this.options.minTokens - 1],
+                },
+            };
+        }
+        else {
+            return {
+                done: true,
+                value: false,
+            };
+        }
+    }
+}
+exports.TokensMap = TokensMap;
+function generateMapsForFormats(id, data, tokens, options) {
+    return Object
+        .values(groupByFormat(tokens))
+        .map((formatTokens) => new TokensMap(id, data, formatTokens, formatTokens[0].format, options));
+}
+exports.generateMapsForFormats = generateMapsForFormats;
+function createTokensMaps(id, data, tokens, options) {
+    return generateMapsForFormats(id, data, tokens, options);
+}
+exports.createTokensMaps = createTokensMaps;
+//# sourceMappingURL=token-map.js.map
+
+/***/ }),
+
+/***/ 74092:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const reprism = __nccwpck_require__(18042);
+const formats_1 = __nccwpck_require__(24953);
+const token_map_1 = __nccwpck_require__(73303);
+const grammar_loader_1 = __nccwpck_require__(57230);
+const ignore = {
+    ignore: [
+        {
+            pattern: /(jscpd:ignore-start)[\s\S]*?(?=jscpd:ignore-end)/,
+            lookbehind: true,
+            greedy: true,
+        },
+        {
+            pattern: /jscpd:ignore-start/,
+            greedy: false,
+        },
+        {
+            pattern: /jscpd:ignore-end/,
+            greedy: false,
+        },
+    ],
+};
+const punctuation = {
+    // eslint-disable-next-line @typescript-eslint/camelcase
+    new_line: /\n/,
+    empty: /\s+/,
+};
+const initializeFormats = () => {
+    grammar_loader_1.loadLanguages();
+    Object
+        .keys(reprism.default.languages)
+        .forEach((lang) => {
+        if (lang !== 'extend' && lang !== 'insertBefore' && lang !== 'DFS') {
+            reprism.default.languages[lang] = Object.assign(Object.assign(Object.assign({}, ignore), reprism.default.languages[lang]), punctuation);
+        }
+    });
+};
+initializeFormats();
+function getLanguagePrismName(lang) {
+    if (lang in formats_1.FORMATS && formats_1.FORMATS[lang].parent) {
+        return formats_1.FORMATS[lang].parent;
+    }
+    return lang;
+}
+function tokenize(code, language) {
+    let length = 0;
+    let line = 1;
+    let column = 1;
+    function sanitizeLangName(name) {
+        return name && name.replace ? name.replace('language-', '') : 'unknown';
+    }
+    function createTokenFromString(token, lang) {
+        return [
+            {
+                format: lang,
+                type: 'default',
+                value: token,
+                length: token.length,
+            },
+        ];
+    }
+    function calculateLocation(token, position) {
+        const result = token;
+        const lines = typeof result.value === 'string' && result.value.split ? result.value.split('\n') : [];
+        const newLines = lines.length - 1;
+        const start = {
+            line,
+            column,
+            position
+        };
+        column = newLines >= 0 ? lines[lines.length - 1].length + 1 : column;
+        const end = {
+            line: line + newLines,
+            column,
+            position
+        };
+        result.loc = { start, end };
+        result.range = [length, length + result.length];
+        length += result.length;
+        line += newLines;
+        return result;
+    }
+    function createTokenFromFlatToken(token, lang) {
+        return [
+            {
+                format: lang,
+                type: token.type,
+                value: token.content,
+                length: token.length,
+            },
+        ];
+    }
+    function createTokens(token, lang) {
+        if (token.content && typeof token.content === 'string') {
+            return createTokenFromFlatToken(token, lang);
+        }
+        if (token.content && Array.isArray(token.content)) {
+            let res = [];
+            token.content.forEach((t) => (res = res.concat(createTokens(t, token.alias ? sanitizeLangName(token.alias) : lang))));
+            return res;
+        }
+        return createTokenFromString(token, lang);
+    }
+    let tokens = [];
+    const grammar = reprism.default.languages[getLanguagePrismName(language)];
+    if (!reprism.default.languages[getLanguagePrismName(language)]) {
+        console.warn('Warn: jscpd has issue with support of "' + getLanguagePrismName(language) + '"');
+        return [];
+    }
+    reprism.default.tokenize(code, grammar)
+        .forEach((t) => (tokens = tokens.concat(createTokens(t, language))));
+    return tokens
+        .filter((t) => t.format in formats_1.FORMATS)
+        .map((token, index) => calculateLocation(token, index));
+}
+exports.tokenize = tokenize;
+function setupIgnorePatterns(format, ignorePattern) {
+    const language = getLanguagePrismName(format);
+    const ignorePatterns = ignorePattern.map(pattern => ({
+        pattern: new RegExp(pattern),
+        greedy: false,
+    }));
+    reprism.default.languages[language] = Object.assign(Object.assign({}, ignorePatterns), reprism.default.languages[language]);
+}
+function createTokenMapBasedOnCode(id, data, format, options = {}) {
+    const { mode, ignoreCase, ignorePattern } = options;
+    const tokens = tokenize(data, format)
+        .filter((token) => mode(token, options));
+    if (ignorePattern)
+        setupIgnorePatterns(format, options.ignorePattern);
+    if (ignoreCase) {
+        return token_map_1.createTokensMaps(id, data, tokens.map((token) => {
+            token.value = token.value.toLocaleLowerCase();
+            return token;
+        }), options);
+    }
+    return token_map_1.createTokensMaps(id, data, tokens, options);
+}
+exports.createTokenMapBasedOnCode = createTokenMapBasedOnCode;
+//# sourceMappingURL=tokenize.js.map
 
 /***/ }),
 
@@ -9609,7 +10185,7 @@ exports.Blamer = Blamer;
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const blamer_1 = __nccwpck_require__(6686);
-exports.default = blamer_1.Blamer;
+exports["default"] = blamer_1.Blamer;
 //# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiaW5kZXguanMiLCJzb3VyY2VSb290IjoiIiwic291cmNlcyI6WyIuLi8uLi9zcmMvaW5kZXgudHMiXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6Ijs7QUFBQSxxQ0FBa0M7QUFHbEMsa0JBQWUsZUFBTSxDQUFDIn0=
 
 /***/ }),
@@ -11851,12 +12427,12 @@ module['exports'] = colors;
 
 colors.themes = {};
 
-var util = __nccwpck_require__(31669);
+var util = __nccwpck_require__(73837);
 var ansiStyles = colors.styles = __nccwpck_require__(73104);
 var defineProps = Object.defineProperties;
 var newLineRegex = new RegExp(/[\r\n]+/g);
 
-colors.supportsColor = __nccwpck_require__(10662).supportsColor;
+colors.supportsColor = (__nccwpck_require__(10662).supportsColor);
 
 if (typeof colors.enabled === 'undefined') {
   colors.enabled = colors.supportsColor() !== false;
@@ -12443,7 +13019,7 @@ THE SOFTWARE.
 
 
 
-var os = __nccwpck_require__(12087);
+var os = __nccwpck_require__(22037);
 var hasFlag = __nccwpck_require__(10223);
 
 var env = process.env;
@@ -12594,7 +13170,7 @@ module['exports'] = colors;
 "use strict";
 
 
-const cp = __nccwpck_require__(63129);
+const cp = __nccwpck_require__(32081);
 const parse = __nccwpck_require__(66855);
 const enoent = __nccwpck_require__(44101);
 
@@ -12708,7 +13284,7 @@ module.exports = {
 "use strict";
 
 
-const path = __nccwpck_require__(85622);
+const path = __nccwpck_require__(71017);
 const resolveCommand = __nccwpck_require__(87274);
 const escape = __nccwpck_require__(34274);
 const readShebang = __nccwpck_require__(41252);
@@ -12860,7 +13436,7 @@ module.exports.argument = escapeArgument;
 "use strict";
 
 
-const fs = __nccwpck_require__(35747);
+const fs = __nccwpck_require__(57147);
 const shebangCommand = __nccwpck_require__(67032);
 
 function readShebang(command) {
@@ -12891,7 +13467,7 @@ module.exports = readShebang;
 "use strict";
 
 
-const path = __nccwpck_require__(85622);
+const path = __nccwpck_require__(71017);
 const which = __nccwpck_require__(34207);
 const getPathKey = __nccwpck_require__(20539);
 
@@ -12941,6 +13517,175 @@ function resolveCommand(parsed) {
 }
 
 module.exports = resolveCommand;
+
+
+/***/ }),
+
+/***/ 84697:
+/***/ ((module) => {
+
+/**
+ * Helpers.
+ */
+
+var s = 1000;
+var m = s * 60;
+var h = m * 60;
+var d = h * 24;
+var w = d * 7;
+var y = d * 365.25;
+
+/**
+ * Parse or format the given `val`.
+ *
+ * Options:
+ *
+ *  - `long` verbose formatting [false]
+ *
+ * @param {String|Number} val
+ * @param {Object} [options]
+ * @throws {Error} throw an error if val is not a non-empty string or a number
+ * @return {String|Number}
+ * @api public
+ */
+
+module.exports = function(val, options) {
+  options = options || {};
+  var type = typeof val;
+  if (type === 'string' && val.length > 0) {
+    return parse(val);
+  } else if (type === 'number' && isFinite(val)) {
+    return options.long ? fmtLong(val) : fmtShort(val);
+  }
+  throw new Error(
+    'val is not a non-empty string or a valid number. val=' +
+      JSON.stringify(val)
+  );
+};
+
+/**
+ * Parse the given `str` and return milliseconds.
+ *
+ * @param {String} str
+ * @return {Number}
+ * @api private
+ */
+
+function parse(str) {
+  str = String(str);
+  if (str.length > 100) {
+    return;
+  }
+  var match = /^(-?(?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|years?|yrs?|y)?$/i.exec(
+    str
+  );
+  if (!match) {
+    return;
+  }
+  var n = parseFloat(match[1]);
+  var type = (match[2] || 'ms').toLowerCase();
+  switch (type) {
+    case 'years':
+    case 'year':
+    case 'yrs':
+    case 'yr':
+    case 'y':
+      return n * y;
+    case 'weeks':
+    case 'week':
+    case 'w':
+      return n * w;
+    case 'days':
+    case 'day':
+    case 'd':
+      return n * d;
+    case 'hours':
+    case 'hour':
+    case 'hrs':
+    case 'hr':
+    case 'h':
+      return n * h;
+    case 'minutes':
+    case 'minute':
+    case 'mins':
+    case 'min':
+    case 'm':
+      return n * m;
+    case 'seconds':
+    case 'second':
+    case 'secs':
+    case 'sec':
+    case 's':
+      return n * s;
+    case 'milliseconds':
+    case 'millisecond':
+    case 'msecs':
+    case 'msec':
+    case 'ms':
+      return n;
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * Short format for `ms`.
+ *
+ * @param {Number} ms
+ * @return {String}
+ * @api private
+ */
+
+function fmtShort(ms) {
+  var msAbs = Math.abs(ms);
+  if (msAbs >= d) {
+    return Math.round(ms / d) + 'd';
+  }
+  if (msAbs >= h) {
+    return Math.round(ms / h) + 'h';
+  }
+  if (msAbs >= m) {
+    return Math.round(ms / m) + 'm';
+  }
+  if (msAbs >= s) {
+    return Math.round(ms / s) + 's';
+  }
+  return ms + 'ms';
+}
+
+/**
+ * Long format for `ms`.
+ *
+ * @param {Number} ms
+ * @return {String}
+ * @api private
+ */
+
+function fmtLong(ms) {
+  var msAbs = Math.abs(ms);
+  if (msAbs >= d) {
+    return plural(ms, msAbs, d, 'day');
+  }
+  if (msAbs >= h) {
+    return plural(ms, msAbs, h, 'hour');
+  }
+  if (msAbs >= m) {
+    return plural(ms, msAbs, m, 'minute');
+  }
+  if (msAbs >= s) {
+    return plural(ms, msAbs, s, 'second');
+  }
+  return ms + ' ms';
+}
+
+/**
+ * Pluralization helper.
+ */
+
+function plural(ms, msAbs, n, name) {
+  var isPlural = msAbs >= n * 1.5;
+  return Math.round(ms / n) + ' ' + name + (isPlural ? 's' : '');
+}
 
 
 /***/ }),
@@ -13237,7 +13982,7 @@ function setup(env) {
 	createDebug.disable = disable;
 	createDebug.enable = enable;
 	createDebug.enabled = enabled;
-	createDebug.humanize = __nccwpck_require__(80900);
+	createDebug.humanize = __nccwpck_require__(84697);
 	createDebug.destroy = destroy;
 
 	Object.keys(env).forEach(key => {
@@ -13526,8 +14271,8 @@ if (typeof process === 'undefined' || process.type === 'renderer' || process.bro
  * Module dependencies.
  */
 
-const tty = __nccwpck_require__(33867);
-const util = __nccwpck_require__(31669);
+const tty = __nccwpck_require__(76224);
+const util = __nccwpck_require__(73837);
 
 /**
  * This is the Node.js implementation of `debug()`.
@@ -14281,8 +15026,8 @@ if (true) {
 
 "use strict";
 
-const path = __nccwpck_require__(85622);
-const childProcess = __nccwpck_require__(63129);
+const path = __nccwpck_require__(71017);
+const childProcess = __nccwpck_require__(32081);
 const crossSpawn = __nccwpck_require__(72746);
 const stripFinalNewline = __nccwpck_require__(88174);
 const npmRunPath = __nccwpck_require__(20502);
@@ -14683,7 +15428,7 @@ module.exports = makeError;
 
 "use strict";
 
-const os = __nccwpck_require__(12087);
+const os = __nccwpck_require__(22037);
 const onExit = __nccwpck_require__(24931);
 
 const DEFAULT_FORCE_KILL_TIMEOUT = 1000 * 5;
@@ -15211,7 +15956,7 @@ class ProviderAsync extends provider_1.default {
         return this._reader.static(task.patterns, options);
     }
 }
-exports.default = ProviderAsync;
+exports["default"] = ProviderAsync;
 
 
 /***/ }),
@@ -15281,7 +16026,7 @@ class DeepFilter {
         return !utils.pattern.matchAny(entryPath, patternsRe);
     }
 }
-exports.default = DeepFilter;
+exports["default"] = DeepFilter;
 
 
 /***/ }),
@@ -15345,7 +16090,7 @@ class EntryFilter {
         return utils.pattern.matchAny(filepath, patternsRe);
     }
 }
-exports.default = EntryFilter;
+exports["default"] = EntryFilter;
 
 
 /***/ }),
@@ -15368,7 +16113,7 @@ class ErrorFilter {
         return utils.errno.isEnoentCodeError(error) || this._settings.suppressErrors;
     }
 }
-exports.default = ErrorFilter;
+exports["default"] = ErrorFilter;
 
 
 /***/ }),
@@ -15426,7 +16171,7 @@ class Matcher {
         return utils.array.splitWhen(segments, (segment) => segment.dynamic && utils.pattern.hasGlobStar(segment.pattern));
     }
 }
-exports.default = Matcher;
+exports["default"] = Matcher;
 
 
 /***/ }),
@@ -15472,7 +16217,7 @@ class PartialMatcher extends matcher_1.default {
         return false;
     }
 }
-exports.default = PartialMatcher;
+exports["default"] = PartialMatcher;
 
 
 /***/ }),
@@ -15483,7 +16228,7 @@ exports.default = PartialMatcher;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-const path = __nccwpck_require__(85622);
+const path = __nccwpck_require__(71017);
 const deep_1 = __nccwpck_require__(36983);
 const entry_1 = __nccwpck_require__(71343);
 const error_1 = __nccwpck_require__(36654);
@@ -15528,7 +16273,7 @@ class Provider {
         };
     }
 }
-exports.default = Provider;
+exports["default"] = Provider;
 
 
 /***/ }),
@@ -15539,7 +16284,7 @@ exports.default = Provider;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-const stream_1 = __nccwpck_require__(92413);
+const stream_1 = __nccwpck_require__(12781);
 const stream_2 = __nccwpck_require__(12083);
 const provider_1 = __nccwpck_require__(60257);
 class ProviderStream extends provider_1.default {
@@ -15567,7 +16312,7 @@ class ProviderStream extends provider_1.default {
         return this._reader.static(task.patterns, options);
     }
 }
-exports.default = ProviderStream;
+exports["default"] = ProviderStream;
 
 
 /***/ }),
@@ -15598,7 +16343,7 @@ class ProviderSync extends provider_1.default {
         return this._reader.static(task.patterns, options);
     }
 }
-exports.default = ProviderSync;
+exports["default"] = ProviderSync;
 
 
 /***/ }),
@@ -15632,7 +16377,7 @@ class EntryTransformer {
         return Object.assign(Object.assign({}, entry), { path: filepath });
     }
 }
-exports.default = EntryTransformer;
+exports["default"] = EntryTransformer;
 
 
 /***/ }),
@@ -15643,7 +16388,7 @@ exports.default = EntryTransformer;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-const path = __nccwpck_require__(85622);
+const path = __nccwpck_require__(71017);
 const fsStat = __nccwpck_require__(70109);
 const utils = __nccwpck_require__(45444);
 class Reader {
@@ -15673,7 +16418,7 @@ class Reader {
         return !utils.errno.isEnoentCodeError(error) && !this._settings.suppressErrors;
     }
 }
-exports.default = Reader;
+exports["default"] = Reader;
 
 
 /***/ }),
@@ -15684,7 +16429,7 @@ exports.default = Reader;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-const stream_1 = __nccwpck_require__(92413);
+const stream_1 = __nccwpck_require__(12781);
 const fsStat = __nccwpck_require__(70109);
 const fsWalk = __nccwpck_require__(26026);
 const reader_1 = __nccwpck_require__(65582);
@@ -15736,7 +16481,7 @@ class ReaderStream extends reader_1.default {
         });
     }
 }
-exports.default = ReaderStream;
+exports["default"] = ReaderStream;
 
 
 /***/ }),
@@ -15787,7 +16532,7 @@ class ReaderSync extends reader_1.default {
         return this._statSync(filepath, this._fsStatSettings);
     }
 }
-exports.default = ReaderSync;
+exports["default"] = ReaderSync;
 
 
 /***/ }),
@@ -15799,8 +16544,8 @@ exports.default = ReaderSync;
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.DEFAULT_FILE_SYSTEM_ADAPTER = void 0;
-const fs = __nccwpck_require__(35747);
-const os = __nccwpck_require__(12087);
+const fs = __nccwpck_require__(57147);
+const os = __nccwpck_require__(22037);
 /**
  * The `os.cpus` method can return zero. We expect the number of cores to be greater than zero.
  * https://github.com/nodejs/node/blob/7faeddf23a98c53896f8b574a6e66589e8fb1eb8/lib/os.js#L106-L107
@@ -15852,7 +16597,7 @@ class Settings {
         return Object.assign(Object.assign({}, exports.DEFAULT_FILE_SYSTEM_ADAPTER), methods);
     }
 }
-exports.default = Settings;
+exports["default"] = Settings;
 
 
 /***/ }),
@@ -15961,7 +16706,7 @@ exports.string = string;
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.removeLeadingDotSegment = exports.escape = exports.makeAbsolute = exports.unixify = void 0;
-const path = __nccwpck_require__(85622);
+const path = __nccwpck_require__(71017);
 const LEADING_DOT_SEGMENT_CHARACTERS_COUNT = 2; // ./ or .\\
 const UNESCAPED_GLOB_SYMBOLS_RE = /(\\?)([()*?[\]{|}]|^!|[!+@](?=\())/g;
 /**
@@ -16002,7 +16747,7 @@ exports.removeLeadingDotSegment = removeLeadingDotSegment;
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.matchAny = exports.convertPatternsToRe = exports.makeRe = exports.getPatternParts = exports.expandBraceExpansion = exports.expandPatternsWithBraceExpansion = exports.isAffectDepthOfReadingPattern = exports.endsWithSlashGlobStar = exports.hasGlobStar = exports.getBaseDirectory = exports.isPatternRelatedToParentDirectory = exports.getPatternsOutsideCurrentDirectory = exports.getPatternsInsideCurrentDirectory = exports.getPositivePatterns = exports.getNegativePatterns = exports.isPositivePattern = exports.isNegativePattern = exports.convertToNegativePattern = exports.convertToPositivePattern = exports.isDynamicPattern = exports.isStaticPattern = void 0;
-const path = __nccwpck_require__(85622);
+const path = __nccwpck_require__(71017);
 const globParent = __nccwpck_require__(54655);
 const micromatch = __nccwpck_require__(76228);
 const GLOBSTAR = '**';
@@ -16480,7 +17225,7 @@ module.exports.promise = queueAsPromised
 
 
 
-const util = __nccwpck_require__(31669);
+const util = __nccwpck_require__(73837);
 const toRegexRange = __nccwpck_require__(1861);
 
 const isObject = val => val !== null && typeof val === 'object' && !Array.isArray(val);
@@ -16735,7 +17480,8 @@ module.exports = function () {
       /* eslint global-require: off */
       debug = __nccwpck_require__(38237)("follow-redirects");
     }
-    catch (error) {
+    catch (error) { /* */ }
+    if (typeof debug !== "function") {
       debug = function () { /* */ };
     }
   }
@@ -16748,12 +17494,12 @@ module.exports = function () {
 /***/ 67707:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
-var url = __nccwpck_require__(78835);
+var url = __nccwpck_require__(57310);
 var URL = url.URL;
-var http = __nccwpck_require__(15876);
-var https = __nccwpck_require__(57211);
-var Writable = __nccwpck_require__(92413).Writable;
-var assert = __nccwpck_require__(42357);
+var http = __nccwpck_require__(13685);
+var https = __nccwpck_require__(95687);
+var Writable = (__nccwpck_require__(12781).Writable);
+var assert = __nccwpck_require__(39491);
 var debug = __nccwpck_require__(31133);
 
 // Create handlers that pass events from native requests
@@ -16897,10 +17643,8 @@ RedirectableRequest.prototype.removeHeader = function (name) {
 // Global timeout for all underlying requests
 RedirectableRequest.prototype.setTimeout = function (msecs, callback) {
   var self = this;
-  if (callback) {
-    this.on("timeout", callback);
-  }
 
+  // Destroys the socket on timeout
   function destroyOnTimeout(socket) {
     socket.setTimeout(msecs);
     socket.removeListener("timeout", socket.destroy);
@@ -16919,18 +17663,26 @@ RedirectableRequest.prototype.setTimeout = function (msecs, callback) {
     destroyOnTimeout(socket);
   }
 
-  // Prevent a timeout from triggering
+  // Stops a timeout from triggering
   function clearTimer() {
-    clearTimeout(this._timeout);
+    if (self._timeout) {
+      clearTimeout(self._timeout);
+      self._timeout = null;
+    }
     if (callback) {
       self.removeListener("timeout", callback);
     }
-    if (!this.socket) {
+    if (!self.socket) {
       self._currentRequest.removeListener("socket", startTimer);
     }
   }
 
-  // Start the timer when the socket is opened
+  // Attach callback if passed
+  if (callback) {
+    this.on("timeout", callback);
+  }
+
+  // Start the timer if or when the socket is opened
   if (this.socket) {
     startTimer(this.socket);
   }
@@ -16938,6 +17690,7 @@ RedirectableRequest.prototype.setTimeout = function (msecs, callback) {
     this._currentRequest.once("socket", startTimer);
   }
 
+  // Clean up on events
   this.on("socket", destroyOnTimeout);
   this.once("response", clearTimer);
   this.once("error", clearTimer);
@@ -17290,9 +18043,9 @@ module.exports.wrap = wrap;
 
 
 const fs = __nccwpck_require__(77758)
-const path = __nccwpck_require__(85622)
-const mkdirsSync = __nccwpck_require__(98605).mkdirsSync
-const utimesMillisSync = __nccwpck_require__(52548).utimesMillisSync
+const path = __nccwpck_require__(71017)
+const mkdirsSync = (__nccwpck_require__(98605).mkdirsSync)
+const utimesMillisSync = (__nccwpck_require__(52548).utimesMillisSync)
 const stat = __nccwpck_require__(73901)
 
 function copySync (src, dest, opts) {
@@ -17477,10 +18230,10 @@ module.exports = {
 
 
 const fs = __nccwpck_require__(77758)
-const path = __nccwpck_require__(85622)
-const mkdirs = __nccwpck_require__(98605).mkdirs
-const pathExists = __nccwpck_require__(43835).pathExists
-const utimesMillis = __nccwpck_require__(52548).utimesMillis
+const path = __nccwpck_require__(71017)
+const mkdirs = (__nccwpck_require__(98605).mkdirs)
+const pathExists = (__nccwpck_require__(43835).pathExists)
+const utimesMillis = (__nccwpck_require__(52548).utimesMillis)
 const stat = __nccwpck_require__(73901)
 
 function copy (src, dest, opts, cb) {
@@ -17716,7 +18469,7 @@ module.exports = copy
 "use strict";
 
 
-const u = __nccwpck_require__(9046).fromCallback
+const u = (__nccwpck_require__(9046).fromCallback)
 module.exports = {
   copy: u(__nccwpck_require__(38834))
 }
@@ -17730,9 +18483,9 @@ module.exports = {
 "use strict";
 
 
-const u = __nccwpck_require__(9046).fromCallback
+const u = (__nccwpck_require__(9046).fromCallback)
 const fs = __nccwpck_require__(77758)
-const path = __nccwpck_require__(85622)
+const path = __nccwpck_require__(71017)
 const mkdir = __nccwpck_require__(98605)
 const remove = __nccwpck_require__(47357)
 
@@ -17786,8 +18539,8 @@ module.exports = {
 "use strict";
 
 
-const u = __nccwpck_require__(9046).fromCallback
-const path = __nccwpck_require__(85622)
+const u = (__nccwpck_require__(9046).fromCallback)
+const path = __nccwpck_require__(71017)
 const fs = __nccwpck_require__(77758)
 const mkdir = __nccwpck_require__(98605)
 
@@ -17894,11 +18647,11 @@ module.exports = {
 "use strict";
 
 
-const u = __nccwpck_require__(9046).fromCallback
-const path = __nccwpck_require__(85622)
+const u = (__nccwpck_require__(9046).fromCallback)
+const path = __nccwpck_require__(71017)
 const fs = __nccwpck_require__(77758)
 const mkdir = __nccwpck_require__(98605)
-const pathExists = __nccwpck_require__(43835).pathExists
+const pathExists = (__nccwpck_require__(43835).pathExists)
 
 function createLink (srcpath, dstpath, callback) {
   function makeLink (srcpath, dstpath) {
@@ -17963,9 +18716,9 @@ module.exports = {
 "use strict";
 
 
-const path = __nccwpck_require__(85622)
+const path = __nccwpck_require__(71017)
 const fs = __nccwpck_require__(77758)
-const pathExists = __nccwpck_require__(43835).pathExists
+const pathExists = (__nccwpck_require__(43835).pathExists)
 
 /**
  * Function that returns two types of paths, one relative to symlink, and one
@@ -18109,8 +18862,8 @@ module.exports = {
 "use strict";
 
 
-const u = __nccwpck_require__(9046).fromCallback
-const path = __nccwpck_require__(85622)
+const u = (__nccwpck_require__(9046).fromCallback)
+const path = __nccwpck_require__(71017)
 const fs = __nccwpck_require__(77758)
 const _mkdirs = __nccwpck_require__(98605)
 const mkdirs = _mkdirs.mkdirs
@@ -18124,7 +18877,7 @@ const _symlinkType = __nccwpck_require__(18254)
 const symlinkType = _symlinkType.symlinkType
 const symlinkTypeSync = _symlinkType.symlinkTypeSync
 
-const pathExists = __nccwpck_require__(43835).pathExists
+const pathExists = (__nccwpck_require__(43835).pathExists)
 
 function createSymlink (srcpath, dstpath, type, callback) {
   callback = (typeof type === 'function') ? type : callback
@@ -18181,7 +18934,7 @@ module.exports = {
 
 // This is adapted from https://github.com/normalize/mz
 // Copyright (c) 2014-2016 Jonathan Ong me@jongleberry.com and Contributors
-const u = __nccwpck_require__(9046).fromCallback
+const u = (__nccwpck_require__(9046).fromCallback)
 const fs = __nccwpck_require__(77758)
 
 const api = [
@@ -18337,7 +19090,7 @@ module.exports = {
 
 // Export fs.promises as a getter property so that we don't trigger
 // ExperimentalWarning before fs.promises is actually accessed.
-const fs = __nccwpck_require__(35747)
+const fs = __nccwpck_require__(57147)
 if (Object.getOwnPropertyDescriptor(fs, 'promises')) {
   Object.defineProperty(module.exports, "promises", ({
     get () { return fs.promises }
@@ -18353,7 +19106,7 @@ if (Object.getOwnPropertyDescriptor(fs, 'promises')) {
 "use strict";
 
 
-const u = __nccwpck_require__(9046).fromPromise
+const u = (__nccwpck_require__(9046).fromPromise)
 const jsonFile = __nccwpck_require__(18970)
 
 jsonFile.outputJson = u(__nccwpck_require__(60531))
@@ -18435,7 +19188,7 @@ module.exports = outputJson
 
 "use strict";
 
-const u = __nccwpck_require__(9046).fromPromise
+const u = (__nccwpck_require__(9046).fromPromise)
 const { makeDir: _makeDir, makeDirSync } = __nccwpck_require__(52751)
 const makeDir = u(_makeDir)
 
@@ -18463,7 +19216,7 @@ module.exports = {
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 const fs = __nccwpck_require__(61176)
-const path = __nccwpck_require__(85622)
+const path = __nccwpck_require__(71017)
 const atLeastNode = __nccwpck_require__(25995)
 
 const useNativeRecursiveOption = atLeastNode('10.12.0')
@@ -18621,10 +19374,10 @@ module.exports = {
 
 
 const fs = __nccwpck_require__(77758)
-const path = __nccwpck_require__(85622)
-const copySync = __nccwpck_require__(11135).copySync
-const removeSync = __nccwpck_require__(47357).removeSync
-const mkdirpSync = __nccwpck_require__(98605).mkdirpSync
+const path = __nccwpck_require__(71017)
+const copySync = (__nccwpck_require__(11135).copySync)
+const removeSync = (__nccwpck_require__(47357).removeSync)
+const mkdirpSync = (__nccwpck_require__(98605).mkdirpSync)
 const stat = __nccwpck_require__(73901)
 
 function moveSync (src, dest, opts) {
@@ -18675,7 +19428,7 @@ module.exports = moveSync
 "use strict";
 
 
-const u = __nccwpck_require__(9046).fromCallback
+const u = (__nccwpck_require__(9046).fromCallback)
 module.exports = {
   move: u(__nccwpck_require__(72231))
 }
@@ -18690,11 +19443,11 @@ module.exports = {
 
 
 const fs = __nccwpck_require__(77758)
-const path = __nccwpck_require__(85622)
-const copy = __nccwpck_require__(61335).copy
-const remove = __nccwpck_require__(47357).remove
-const mkdirp = __nccwpck_require__(98605).mkdirp
-const pathExists = __nccwpck_require__(43835).pathExists
+const path = __nccwpck_require__(71017)
+const copy = (__nccwpck_require__(61335).copy)
+const remove = (__nccwpck_require__(47357).remove)
+const mkdirp = (__nccwpck_require__(98605).mkdirp)
+const pathExists = (__nccwpck_require__(43835).pathExists)
 const stat = __nccwpck_require__(73901)
 
 function move (src, dest, opts, cb) {
@@ -18762,11 +19515,11 @@ module.exports = move
 "use strict";
 
 
-const u = __nccwpck_require__(9046).fromCallback
+const u = (__nccwpck_require__(9046).fromCallback)
 const fs = __nccwpck_require__(77758)
-const path = __nccwpck_require__(85622)
+const path = __nccwpck_require__(71017)
 const mkdir = __nccwpck_require__(98605)
-const pathExists = __nccwpck_require__(43835).pathExists
+const pathExists = (__nccwpck_require__(43835).pathExists)
 
 function outputFile (file, data, encoding, callback) {
   if (typeof encoding === 'function') {
@@ -18809,7 +19562,7 @@ module.exports = {
 
 "use strict";
 
-const u = __nccwpck_require__(9046).fromPromise
+const u = (__nccwpck_require__(9046).fromPromise)
 const fs = __nccwpck_require__(61176)
 
 function pathExists (path) {
@@ -18830,7 +19583,7 @@ module.exports = {
 "use strict";
 
 
-const u = __nccwpck_require__(9046).fromCallback
+const u = (__nccwpck_require__(9046).fromCallback)
 const rimraf = __nccwpck_require__(38761)
 
 module.exports = {
@@ -18848,8 +19601,8 @@ module.exports = {
 
 
 const fs = __nccwpck_require__(77758)
-const path = __nccwpck_require__(85622)
-const assert = __nccwpck_require__(42357)
+const path = __nccwpck_require__(71017)
+const assert = __nccwpck_require__(39491)
 
 const isWindows = (process.platform === 'win32')
 
@@ -19158,8 +19911,8 @@ rimraf.sync = rimrafSync
 
 
 const fs = __nccwpck_require__(61176)
-const path = __nccwpck_require__(85622)
-const util = __nccwpck_require__(31669)
+const path = __nccwpck_require__(71017)
+const util = __nccwpck_require__(73837)
 const atLeastNode = __nccwpck_require__(25995)
 
 const nodeSupportsBigInt = atLeastNode('10.5.0')
@@ -19337,7 +20090,7 @@ module.exports = {
 
 "use strict";
 
-const {PassThrough: PassThroughStream} = __nccwpck_require__(92413);
+const {PassThrough: PassThroughStream} = __nccwpck_require__(12781);
 
 module.exports = options => {
 	options = {...options};
@@ -19397,7 +20150,7 @@ module.exports = options => {
 
 "use strict";
 
-const {constants: BufferConstants} = __nccwpck_require__(64293);
+const {constants: BufferConstants} = __nccwpck_require__(14300);
 const pump = __nccwpck_require__(18341);
 const bufferStream = __nccwpck_require__(91585);
 
@@ -19452,7 +20205,7 @@ async function getStream(inputStream, options) {
 
 module.exports = getStream;
 // TODO: Remove this for the next major release
-module.exports.default = getStream;
+module.exports["default"] = getStream;
 module.exports.buffer = (stream, options) => getStream(stream, {...options, encoding: 'buffer'});
 module.exports.array = (stream, options) => getStream(stream, {...options, array: true});
 module.exports.MaxBufferError = MaxBufferError;
@@ -19467,8 +20220,8 @@ module.exports.MaxBufferError = MaxBufferError;
 
 
 var isGlob = __nccwpck_require__(34466);
-var pathPosixDirname = __nccwpck_require__(85622).posix.dirname;
-var isWin32 = __nccwpck_require__(12087).platform() === 'win32';
+var pathPosixDirname = (__nccwpck_require__(71017).posix.dirname);
+var isWin32 = (__nccwpck_require__(22037).platform)() === 'win32';
 
 var slash = '/';
 var backslash = /\\/g;
@@ -19544,12 +20297,12 @@ function clone (obj) {
 /***/ 77758:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
-var fs = __nccwpck_require__(35747)
+var fs = __nccwpck_require__(57147)
 var polyfills = __nccwpck_require__(20263)
 var legacy = __nccwpck_require__(73086)
 var clone = __nccwpck_require__(67356)
 
-var util = __nccwpck_require__(31669)
+var util = __nccwpck_require__(73837)
 
 /* istanbul ignore next - node 0.x polyfill */
 var gracefulQueue
@@ -19630,7 +20383,7 @@ if (!fs[gracefulQueue]) {
   if (/\bgfs4\b/i.test(process.env.NODE_DEBUG || '')) {
     process.on('exit', function() {
       debug(fs[gracefulQueue])
-      __nccwpck_require__(42357).equal(fs[gracefulQueue].length, 0)
+      __nccwpck_require__(39491).equal(fs[gracefulQueue].length, 0)
     })
   }
 }
@@ -19924,7 +20677,7 @@ function retry () {
 /***/ 73086:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
-var Stream = __nccwpck_require__(92413).Stream
+var Stream = (__nccwpck_require__(12781).Stream)
 
 module.exports = legacy
 
@@ -20049,7 +20802,7 @@ function legacy (fs) {
 /***/ 20263:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
-var constants = __nccwpck_require__(27619)
+var constants = __nccwpck_require__(22057)
 
 var origCwd = process.cwd
 var cwd = null
@@ -20699,7 +21452,7 @@ standard:"other"}];exports.SIGNALS=SIGNALS;
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
-Object.defineProperty(exports, "__esModule", ({value:true}));exports.signalsByNumber=exports.signalsByName=void 0;var _os=__nccwpck_require__(12087);
+Object.defineProperty(exports, "__esModule", ({value:true}));exports.signalsByNumber=exports.signalsByName=void 0;var _os=__nccwpck_require__(22037);
 
 var _signals=__nccwpck_require__(86435);
 var _realtime=__nccwpck_require__(25295);
@@ -20803,7 +21556,7 @@ const SIGRTMAX=64;exports.SIGRTMAX=SIGRTMAX;
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
-Object.defineProperty(exports, "__esModule", ({value:true}));exports.getSignals=void 0;var _os=__nccwpck_require__(12087);
+Object.defineProperty(exports, "__esModule", ({value:true}));exports.getSignals=void 0;var _os=__nccwpck_require__(22037);
 
 var _core=__nccwpck_require__(28213);
 var _realtime=__nccwpck_require__(25295);
@@ -20921,7 +21674,7 @@ const isFullwidthCodePoint = codePoint => {
 };
 
 module.exports = isFullwidthCodePoint;
-module.exports.default = isFullwidthCodePoint;
+module.exports["default"] = isFullwidthCodePoint;
 
 
 /***/ }),
@@ -21093,7 +21846,7 @@ module.exports = isStream;
 /***/ 97126:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
-var fs = __nccwpck_require__(35747)
+var fs = __nccwpck_require__(57147)
 var core
 if (process.platform === 'win32' || global.TESTING_WINDOWS) {
   core = __nccwpck_require__(42001)
@@ -21160,7 +21913,7 @@ function sync (path, options) {
 module.exports = isexe
 isexe.sync = sync
 
-var fs = __nccwpck_require__(35747)
+var fs = __nccwpck_require__(57147)
 
 function isexe (path, options, cb) {
   fs.stat(path, function (er, stat) {
@@ -21208,7 +21961,7 @@ function checkMode (stat, options) {
 module.exports = isexe
 isexe.sync = sync
 
-var fs = __nccwpck_require__(35747)
+var fs = __nccwpck_require__(57147)
 
 function checkPathExt (path, options) {
   var pathext = options.pathExt !== undefined ?
@@ -21258,7 +22011,7 @@ let _fs
 try {
   _fs = __nccwpck_require__(77758)
 } catch (_) {
-  _fs = __nccwpck_require__(35747)
+  _fs = __nccwpck_require__(57147)
 }
 const universalify = __nccwpck_require__(9046)
 const { stringify, stripBom } = __nccwpck_require__(35902)
@@ -21630,7 +22383,7 @@ function toAlignment(value) {
 "use strict";
 
 
-const { PassThrough } = __nccwpck_require__(92413);
+const { PassThrough } = __nccwpck_require__(12781);
 
 module.exports = function (/*streams...*/) {
   var sources = []
@@ -21685,7 +22438,7 @@ module.exports = function (/*streams...*/) {
  * Copyright (c) 2014-2020 Teambition
  * Licensed under the MIT license.
  */
-const Stream = __nccwpck_require__(92413)
+const Stream = __nccwpck_require__(12781)
 const PassThrough = Stream.PassThrough
 const slice = Array.prototype.slice
 
@@ -21831,7 +22584,7 @@ function pauseStreams (streams, options) {
 "use strict";
 
 
-const util = __nccwpck_require__(31669);
+const util = __nccwpck_require__(73837);
 const braces = __nccwpck_require__(50610);
 const picomatch = __nccwpck_require__(78569);
 const utils = __nccwpck_require__(30479);
@@ -22316,176 +23069,7 @@ const mimicFn = (to, from) => {
 
 module.exports = mimicFn;
 // TODO: Remove this for the next major release
-module.exports.default = mimicFn;
-
-
-/***/ }),
-
-/***/ 80900:
-/***/ ((module) => {
-
-/**
- * Helpers.
- */
-
-var s = 1000;
-var m = s * 60;
-var h = m * 60;
-var d = h * 24;
-var w = d * 7;
-var y = d * 365.25;
-
-/**
- * Parse or format the given `val`.
- *
- * Options:
- *
- *  - `long` verbose formatting [false]
- *
- * @param {String|Number} val
- * @param {Object} [options]
- * @throws {Error} throw an error if val is not a non-empty string or a number
- * @return {String|Number}
- * @api public
- */
-
-module.exports = function(val, options) {
-  options = options || {};
-  var type = typeof val;
-  if (type === 'string' && val.length > 0) {
-    return parse(val);
-  } else if (type === 'number' && isFinite(val)) {
-    return options.long ? fmtLong(val) : fmtShort(val);
-  }
-  throw new Error(
-    'val is not a non-empty string or a valid number. val=' +
-      JSON.stringify(val)
-  );
-};
-
-/**
- * Parse the given `str` and return milliseconds.
- *
- * @param {String} str
- * @return {Number}
- * @api private
- */
-
-function parse(str) {
-  str = String(str);
-  if (str.length > 100) {
-    return;
-  }
-  var match = /^(-?(?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|years?|yrs?|y)?$/i.exec(
-    str
-  );
-  if (!match) {
-    return;
-  }
-  var n = parseFloat(match[1]);
-  var type = (match[2] || 'ms').toLowerCase();
-  switch (type) {
-    case 'years':
-    case 'year':
-    case 'yrs':
-    case 'yr':
-    case 'y':
-      return n * y;
-    case 'weeks':
-    case 'week':
-    case 'w':
-      return n * w;
-    case 'days':
-    case 'day':
-    case 'd':
-      return n * d;
-    case 'hours':
-    case 'hour':
-    case 'hrs':
-    case 'hr':
-    case 'h':
-      return n * h;
-    case 'minutes':
-    case 'minute':
-    case 'mins':
-    case 'min':
-    case 'm':
-      return n * m;
-    case 'seconds':
-    case 'second':
-    case 'secs':
-    case 'sec':
-    case 's':
-      return n * s;
-    case 'milliseconds':
-    case 'millisecond':
-    case 'msecs':
-    case 'msec':
-    case 'ms':
-      return n;
-    default:
-      return undefined;
-  }
-}
-
-/**
- * Short format for `ms`.
- *
- * @param {Number} ms
- * @return {String}
- * @api private
- */
-
-function fmtShort(ms) {
-  var msAbs = Math.abs(ms);
-  if (msAbs >= d) {
-    return Math.round(ms / d) + 'd';
-  }
-  if (msAbs >= h) {
-    return Math.round(ms / h) + 'h';
-  }
-  if (msAbs >= m) {
-    return Math.round(ms / m) + 'm';
-  }
-  if (msAbs >= s) {
-    return Math.round(ms / s) + 's';
-  }
-  return ms + 'ms';
-}
-
-/**
- * Long format for `ms`.
- *
- * @param {Number} ms
- * @return {String}
- * @api private
- */
-
-function fmtLong(ms) {
-  var msAbs = Math.abs(ms);
-  if (msAbs >= d) {
-    return plural(ms, msAbs, d, 'day');
-  }
-  if (msAbs >= h) {
-    return plural(ms, msAbs, h, 'hour');
-  }
-  if (msAbs >= m) {
-    return plural(ms, msAbs, m, 'minute');
-  }
-  if (msAbs >= s) {
-    return plural(ms, msAbs, s, 'second');
-  }
-  return ms + ' ms';
-}
-
-/**
- * Pluralization helper.
- */
-
-function plural(ms, msAbs, n, name) {
-  var isPlural = msAbs >= n * 1.5;
-  return Math.round(ms / n) + ' ' + name + (isPlural ? 's' : '');
-}
+module.exports["default"] = mimicFn;
 
 
 /***/ }),
@@ -22500,11 +23084,11 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 
 function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
 
-var Stream = _interopDefault(__nccwpck_require__(92413));
-var http = _interopDefault(__nccwpck_require__(15876));
-var Url = _interopDefault(__nccwpck_require__(78835));
-var https = _interopDefault(__nccwpck_require__(57211));
-var zlib = _interopDefault(__nccwpck_require__(78761));
+var Stream = _interopDefault(__nccwpck_require__(12781));
+var http = _interopDefault(__nccwpck_require__(13685));
+var Url = _interopDefault(__nccwpck_require__(57310));
+var https = _interopDefault(__nccwpck_require__(95687));
+var zlib = _interopDefault(__nccwpck_require__(59796));
 
 // Based on https://github.com/tmpvar/jsdom/blob/aa85b2abf07766ff7bf5c1f6daafb3726f2f2db5/lib/jsdom/living/blob.js
 
@@ -22655,7 +23239,7 @@ FetchError.prototype.name = 'FetchError';
 
 let convert;
 try {
-	convert = __nccwpck_require__(22877).convert;
+	convert = (__nccwpck_require__(22877).convert);
 } catch (e) {}
 
 const INTERNALS = Symbol('Body internals');
@@ -24138,7 +24722,7 @@ fetch.Promise = global.Promise;
 
 module.exports = exports = fetch;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.default = exports;
+exports["default"] = exports;
 exports.Headers = Headers;
 exports.Request = Request;
 exports.Response = Response;
@@ -24152,7 +24736,7 @@ exports.FetchError = FetchError;
 
 "use strict";
 
-const path = __nccwpck_require__(85622);
+const path = __nccwpck_require__(71017);
 const pathKey = __nccwpck_require__(20539);
 
 const npmRunPath = options => {
@@ -24182,7 +24766,7 @@ const npmRunPath = options => {
 
 module.exports = npmRunPath;
 // TODO: Remove this for the next major release
-module.exports.default = npmRunPath;
+module.exports["default"] = npmRunPath;
 
 module.exports.env = options => {
 	options = {
@@ -24388,7 +24972,7 @@ const onetime = (function_, options = {}) => {
 
 module.exports = onetime;
 // TODO: Remove this for the next major release
-module.exports.default = onetime;
+module.exports["default"] = onetime;
 
 module.exports.callCount = function_ => {
 	if (!calledFunctions.has(function_)) {
@@ -24420,7 +25004,7 @@ const pathKey = (options = {}) => {
 
 module.exports = pathKey;
 // TODO: Remove this for the next major release
-module.exports.default = pathKey;
+module.exports["default"] = pathKey;
 
 
 /***/ }),
@@ -24442,7 +25026,7 @@ module.exports = __nccwpck_require__(33322);
 "use strict";
 
 
-const path = __nccwpck_require__(85622);
+const path = __nccwpck_require__(71017);
 const WIN_SLASH = '\\\\/';
 const WIN_NO_SLASH = `[^${WIN_SLASH}]`;
 
@@ -25721,7 +26305,7 @@ module.exports = parse;
 "use strict";
 
 
-const path = __nccwpck_require__(85622);
+const path = __nccwpck_require__(71017);
 const scan = __nccwpck_require__(32429);
 const parse = __nccwpck_require__(92139);
 const utils = __nccwpck_require__(30479);
@@ -26470,7 +27054,7 @@ module.exports = scan;
 "use strict";
 
 
-const path = __nccwpck_require__(85622);
+const path = __nccwpck_require__(71017);
 const win32 = process.platform === 'win32';
 const {
   REGEX_BACKSLASH,
@@ -26541,7 +27125,7 @@ exports.wrapOutput = (input, state = {}, options = {}) => {
 
 var once = __nccwpck_require__(1223)
 var eos = __nccwpck_require__(81205)
-var fs = __nccwpck_require__(35747) // we only need fs to get the ReadStream and WriteStream prototypes
+var fs = __nccwpck_require__(57147) // we only need fs to get the ReadStream and WriteStream prototypes
 
 var noop = function () {}
 var ancient = /^v?\.0/.test(process.version)
@@ -26728,7 +27312,7 @@ function repeat(str, num) {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'abap',
   init: function init(Prism) {
     Prism.languages.abap = {
@@ -26793,7 +27377,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'actionscript',
   init: function init(Prism) {
     Prism.languages.actionscript = Prism.languages.extend('javascript', {
@@ -26827,7 +27411,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'ada',
   init: function init(Prism) {
     Prism.languages.ada = {
@@ -26860,7 +27444,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'apacheconf',
   init: function init(Prism) {
     Prism.languages.apacheconf = {
@@ -26924,7 +27508,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'apl',
   init: function init(Prism) {
     Prism.languages.apl = {
@@ -26973,7 +27557,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'applescript',
   init: function init(Prism) {
     Prism.languages.applescript = {
@@ -27004,7 +27588,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'arff',
   init: function init(Prism) {
     Prism.languages.arff = {
@@ -27031,7 +27615,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'asciidoc',
   init: function init(Prism) {
     (function (Prism) {
@@ -27309,7 +27893,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'asm6502',
   init: function init(Prism) {
     Prism.languages.asm6502 = {
@@ -27354,7 +27938,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'aspnet',
   init: function init(Prism) {
     Prism.languages.aspnet = Prism.languages.extend('markup', {
@@ -27407,7 +27991,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'autohotkey',
   init: function init(Prism) {
     // NOTES - follows first-first highlight method, block is locked after highlight, different from SyntaxHl
@@ -27451,7 +28035,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'autoit',
   init: function init(Prism) {
     Prism.languages.autoit = {
@@ -27499,7 +28083,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'bash',
   init: function init(Prism) {
     (function (Prism) {
@@ -27594,7 +28178,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'basic',
   init: function init(Prism) {
     Prism.languages.basic = {
@@ -27628,7 +28212,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'batch',
   init: function init(Prism) {
     (function (Prism) {
@@ -27732,7 +28316,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'brainfuck',
   init: function init(Prism) {
     Prism.languages.brainfuck = {
@@ -27769,7 +28353,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'bro',
   init: function init(Prism) {
     Prism.languages.bro = {
@@ -27833,7 +28417,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'c',
   init: function init(Prism) {
     Prism.languages.c = Prism.languages.extend('clike', {
@@ -27883,7 +28467,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'clike',
   init: function init(Prism) {
     Prism.languages.clike = {
@@ -27927,7 +28511,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'clojure',
   init: function init(Prism) {
     // Copied from https://github.com/jeluard/prism-clojure
@@ -27957,7 +28541,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'coffeescript',
   init: function init(Prism) {
     (function (Prism) {
@@ -28055,7 +28639,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'cpp',
   init: function init(Prism) {
     Prism.languages.cpp = Prism.languages.extend('c', {
@@ -28092,7 +28676,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'csharp',
   init: function init(Prism) {
     Prism.languages.csharp = Prism.languages.extend('clike', {
@@ -28180,7 +28764,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'csp',
   init: function init(Prism) {
     /**
@@ -28222,7 +28806,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'css-extras',
   init: function init(Prism) {
     Prism.languages.css.selector = {
@@ -28255,7 +28839,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'css',
   init: function init(Prism) {
     Prism.languages.css = {
@@ -28324,7 +28908,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'd',
   init: function init(Prism) {
     Prism.languages.d = Prism.languages.extend('clike', {
@@ -28398,7 +28982,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'dart',
   init: function init(Prism) {
     Prism.languages.dart = Prism.languages.extend('clike', {
@@ -28433,7 +29017,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'diff',
   init: function init(Prism) {
     Prism.languages.diff = {
@@ -28469,7 +29053,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'django',
   init: function init(Prism) {
     // Django/Jinja2 syntax definition for Prism.js <http://prismjs.com> syntax highlighter.
@@ -28529,7 +29113,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'docker',
   init: function init(Prism) {
     Prism.languages.docker = {
@@ -28557,7 +29141,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'eiffel',
   init: function init(Prism) {
     Prism.languages.eiffel = {
@@ -28609,7 +29193,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'elixir',
   init: function init(Prism) {
     Prism.languages.elixir = {
@@ -28710,7 +29294,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'erlang',
   init: function init(Prism) {
     Prism.languages.erlang = {
@@ -28762,7 +29346,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'flow',
   init: function init(Prism) {
     (function (Prism) {
@@ -28808,7 +29392,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'fortran',
   init: function init(Prism) {
     Prism.languages.fortran = {
@@ -28861,7 +29445,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'fsharp',
   init: function init(Prism) {
     Prism.languages.fsharp = Prism.languages.extend('clike', {
@@ -28906,7 +29490,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'gedcom',
   init: function init(Prism) {
     Prism.languages.gedcom = {
@@ -28951,7 +29535,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'gherkin',
   init: function init(Prism) {
     Prism.languages.gherkin = {
@@ -29047,7 +29631,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
 					value: true
 }));
-exports.default = {
+exports["default"] = {
 					language: 'git',
 					init: function init(Prism) {
 										Prism.languages.git = {
@@ -29132,7 +29716,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'glsl',
   init: function init(Prism) {
     Prism.languages.glsl = Prism.languages.extend('clike', {
@@ -29162,7 +29746,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'go',
   init: function init(Prism) {
     Prism.languages.go = Prism.languages.extend('clike', {
@@ -29191,7 +29775,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'graphql',
   init: function init(Prism) {
     Prism.languages.graphql = {
@@ -29229,7 +29813,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'groovy',
   init: function init(Prism) {
     Prism.languages.groovy = Prism.languages.extend('clike', {
@@ -29308,7 +29892,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'haml',
   init: function init(Prism) {
     /* TODO
@@ -29460,7 +30044,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'handlebars',
   init: function init(Prism) {
     (function (Prism) {
@@ -29512,7 +30096,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'haskell',
   init: function init(Prism) {
     Prism.languages.haskell = {
@@ -29565,7 +30149,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'haxe',
   init: function init(Prism) {
     Prism.languages.haxe = Prism.languages.extend('clike', {
@@ -29627,7 +30211,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'hpkp',
   init: function init(Prism) {
     /**
@@ -29664,7 +30248,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'hsts',
   init: function init(Prism) {
     /**
@@ -29701,7 +30285,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'http',
   init: function init(Prism) {
     Prism.languages.http = {
@@ -29766,7 +30350,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'ichigojam',
   init: function init(Prism) {
     // according to the offical reference (EN)
@@ -29798,7 +30382,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'icon',
   init: function init(Prism) {
     Prism.languages.icon = {
@@ -29835,7 +30419,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'inform7',
   init: function init(Prism) {
     Prism.languages.inform7 = {
@@ -29913,7 +30497,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'ini',
   init: function init(Prism) {
     Prism.languages.ini = {
@@ -29941,7 +30525,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'io',
   init: function init(Prism) {
     Prism.languages.io = {
@@ -29985,7 +30569,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'j',
   init: function init(Prism) {
     Prism.languages.j = {
@@ -30027,7 +30611,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'java',
   init: function init(Prism) {
     Prism.languages.java = Prism.languages.extend('clike', {
@@ -30071,7 +30655,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'javascript',
   init: function init(Prism) {
     Prism.languages.javascript = Prism.languages.extend('clike', {
@@ -30143,7 +30727,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'jolie',
   init: function init(Prism) {
     Prism.languages.jolie = Prism.languages.extend('clike', {
@@ -30215,7 +30799,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'json',
   init: function init(Prism) {
     Prism.languages.json = {
@@ -30246,7 +30830,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'jsx',
   init: function init(Prism) {
     var javascript = Prism.util.clone(Prism.languages.javascript);
@@ -30374,7 +30958,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'julia',
   init: function init(Prism) {
     Prism.languages.julia = {
@@ -30403,7 +30987,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'keyman',
   init: function init(Prism) {
     Prism.languages.keyman = {
@@ -30433,7 +31017,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'kotlin',
   init: function init(Prism) {
     (function (Prism) {
@@ -30505,7 +31089,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'latex',
   init: function init(Prism) {
     (function (Prism) {
@@ -30580,7 +31164,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'less',
   init: function init(Prism) {
     /* FIXME :
@@ -30653,7 +31237,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'liquid',
   init: function init(Prism) {
     Prism.languages.liquid = {
@@ -30682,7 +31266,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'lisp',
   init: function init(Prism) {
     (function (Prism) {
@@ -30881,7 +31465,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'livescript',
   init: function init(Prism) {
     Prism.languages.livescript = {
@@ -31006,7 +31590,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'lolcode',
   init: function init(Prism) {
     Prism.languages.lolcode = {
@@ -31068,7 +31652,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'lua',
   init: function init(Prism) {
     Prism.languages.lua = {
@@ -31102,7 +31686,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'makefile',
   init: function init(Prism) {
     Prism.languages.makefile = {
@@ -31152,7 +31736,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'markdown',
   init: function init(Prism) {
     Prism.languages.markdown = Prism.languages.extend('markup', {});
@@ -31283,7 +31867,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'markup-templating',
   init: function init(Prism) {
     Prism.languages['markup-templating'] = {};
@@ -31392,7 +31976,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'markup',
   init: function init(Prism) {
     Prism.languages.markup = {
@@ -31459,7 +32043,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'matlab',
   init: function init(Prism) {
     Prism.languages.matlab = {
@@ -31489,7 +32073,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'mel',
   init: function init(Prism) {
     Prism.languages.mel = {
@@ -31545,7 +32129,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'mizar',
   init: function init(Prism) {
     Prism.languages.mizar = {
@@ -31574,7 +32158,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'monkey',
   init: function init(Prism) {
     Prism.languages.monkey = {
@@ -31619,7 +32203,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'n4js',
   init: function init(Prism) {
     Prism.languages.n4js = Prism.languages.extend('javascript', {
@@ -31650,7 +32234,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'nasm',
   init: function init(Prism) {
     Prism.languages.nasm = {
@@ -31686,7 +32270,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'nginx',
   init: function init(Prism) {
     Prism.languages.nginx = Prism.languages.extend('clike', {
@@ -31714,7 +32298,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'nim',
   init: function init(Prism) {
     Prism.languages.nim = {
@@ -31764,7 +32348,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'nix',
   init: function init(Prism) {
     Prism.languages.nix = {
@@ -31818,7 +32402,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'nsis',
   init: function init(Prism) {
     /**
@@ -31864,7 +32448,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'objectivec',
   init: function init(Prism) {
     Prism.languages.objectivec = Prism.languages.extend('c', {
@@ -31886,7 +32470,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'ocaml',
   init: function init(Prism) {
     Prism.languages.ocaml = {
@@ -31927,7 +32511,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'opencl',
   init: function init(Prism) {
     (function (Prism) {
@@ -31991,7 +32575,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'oz',
   init: function init(Prism) {
     Prism.languages.oz = {
@@ -32030,7 +32614,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'parigp',
   init: function init(Prism) {
     Prism.languages.parigp = {
@@ -32072,7 +32656,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'parser',
   init: function init(Prism) {
     Prism.languages.parser = Prism.languages.extend('markup', {
@@ -32156,7 +32740,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'pascal',
   init: function init(Prism) {
     // Based on Free Pascal
@@ -32213,7 +32797,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'perl',
   init: function init(Prism) {
     Prism.languages.perl = {
@@ -32415,7 +32999,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'php-extras',
   init: function init(Prism) {
     Prism.languages.insertBefore('php', 'variable', {
@@ -32443,7 +33027,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'php',
   init: function init(Prism) {
     /**
@@ -32583,7 +33167,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'powershell',
   init: function init(Prism) {
     Prism.languages.powershell = {
@@ -32644,7 +33228,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'processing',
   init: function init(Prism) {
     Prism.languages.processing = Prism.languages.extend('clike', {
@@ -32679,7 +33263,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'prolog',
   init: function init(Prism) {
     Prism.languages.prolog = {
@@ -32713,7 +33297,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'properties',
   init: function init(Prism) {
     Prism.languages.properties = {
@@ -32739,7 +33323,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'protobuf',
   init: function init(Prism) {
     Prism.languages.protobuf = Prism.languages.extend('clike', {
@@ -32764,7 +33348,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'pug',
   init: function init(Prism) {
     (function (Prism) {
@@ -32956,7 +33540,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'puppet',
   init: function init(Prism) {
     (function (Prism) {
@@ -33102,7 +33686,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'pure',
   init: function init(Prism) {
     (function (Prism) {
@@ -33189,7 +33773,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'python',
   init: function init(Prism) {
     Prism.languages.python = {
@@ -33235,7 +33819,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'q',
   init: function init(Prism) {
     Prism.languages.q = {
@@ -33300,7 +33884,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'qore',
   init: function init(Prism) {
     Prism.languages.qore = Prism.languages.extend('clike', {
@@ -33337,7 +33921,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'r',
   init: function init(Prism) {
     Prism.languages.r = {
@@ -33373,7 +33957,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'reason',
   init: function init(Prism) {
     Prism.languages.reason = Prism.languages.extend('clike', {
@@ -33422,7 +34006,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'renpy',
   init: function init(Prism) {
     Prism.languages.renpy = {
@@ -33468,7 +34052,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'rest',
   init: function init(Prism) {
     Prism.languages.rest = {
@@ -33678,7 +34262,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'rip',
   init: function init(Prism) {
     Prism.languages.rip = {
@@ -33727,7 +34311,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'roboconf',
   init: function init(Prism) {
     Prism.languages.roboconf = {
@@ -33771,7 +34355,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'ruby',
   init: function init(Prism) {
     /**
@@ -33902,7 +34486,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'rust',
   init: function init(Prism) {
     /* TODO
@@ -33979,7 +34563,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'sas',
   init: function init(Prism) {
     Prism.languages.sas = {
@@ -34027,7 +34611,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'sass',
   init: function init(Prism) {
     (function (Prism) {
@@ -34109,7 +34693,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'scala',
   init: function init(Prism) {
     Prism.languages.scala = Prism.languages.extend('java', {
@@ -34141,7 +34725,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'scheme',
   init: function init(Prism) {
     Prism.languages.scheme = {
@@ -34187,7 +34771,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'scss',
   init: function init(Prism) {
     Prism.languages.scss = Prism.languages.extend('css', {
@@ -34276,7 +34860,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'smalltalk',
   init: function init(Prism) {
     Prism.languages.smalltalk = {
@@ -34321,7 +34905,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'smarty',
   init: function init(Prism) {
     /* TODO
@@ -34416,7 +35000,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'soy',
   init: function init(Prism) {
     (function (Prism) {
@@ -34518,7 +35102,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'stylus',
   init: function init(Prism) {
     (function (Prism) {
@@ -34643,7 +35227,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'swift',
   init: function init(Prism) {
     // issues: nested multiline comments
@@ -34685,7 +35269,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'tcl',
   init: function init(Prism) {
     Prism.languages.tcl = {
@@ -34741,7 +35325,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'textile',
   init: function init(Prism) {
     (function (Prism) {
@@ -35011,7 +35595,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'tsx',
   init: function init(Prism) {
     var typescript = Prism.util.clone(Prism.languages.typescript);
@@ -35030,7 +35614,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'twig',
   init: function init(Prism) {
     Prism.languages.twig = {
@@ -35090,7 +35674,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'typescript',
   init: function init(Prism) {
     Prism.languages.typescript = Prism.languages.extend('javascript', {
@@ -35114,7 +35698,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'vbnet',
   init: function init(Prism) {
     Prism.languages.vbnet = Prism.languages.extend('basic', {
@@ -35143,7 +35727,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'velocity',
   init: function init(Prism) {
     (function (Prism) {
@@ -35228,7 +35812,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'verilog',
   init: function init(Prism) {
     Prism.languages.verilog = {
@@ -35265,7 +35849,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'vhdl',
   init: function init(Prism) {
     Prism.languages.vhdl = {
@@ -35305,7 +35889,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'vim',
   init: function init(Prism) {
     Prism.languages.vim = {
@@ -35332,7 +35916,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'visual-basic',
   init: function init(Prism) {
     Prism.languages['visual-basic'] = {
@@ -35380,7 +35964,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'wasm',
   init: function init(Prism) {
     Prism.languages.wasm = {
@@ -35421,7 +36005,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'wiki',
   init: function init(Prism) {
     Prism.languages.wiki = Prism.languages.extend('markup', {
@@ -35510,7 +36094,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'xeora',
   init: function init(Prism) {
     (function (Prism) {
@@ -35640,7 +36224,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'xojo',
   init: function init(Prism) {
     Prism.languages.xojo = {
@@ -35674,7 +36258,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'yaml',
   init: function init(Prism) {
     Prism.languages.yaml = {
@@ -35828,7 +36412,7 @@ var Prism = {
   Token: Token
 };
 
-exports.default = Prism;
+exports["default"] = Prism;
 function highlight(text, language) {
   var _ref = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {},
       _ref$component = _ref.component,
@@ -36208,7 +36792,7 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 
 (0, _core.loadLanguages)([_markup2.default, _css2.default, _clike2.default, _javascript2.default]);
 
-exports.default = _core2.default;
+exports["default"] = _core2.default;
 exports.highlight = _core.highlight;
 exports.loadLanguages = _core.loadLanguages;
 
@@ -36223,7 +36807,7 @@ exports.loadLanguages = _core.loadLanguages;
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'clike',
   init: function init(Prism) {
     Prism.languages.clike = {
@@ -36267,7 +36851,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'css',
   init: function init(Prism) {
     Prism.languages.css = {
@@ -36336,7 +36920,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'javascript',
   init: function init(Prism) {
     Prism.languages.javascript = Prism.languages.extend('clike', {
@@ -36408,7 +36992,7 @@ exports.default = {
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.default = {
+exports["default"] = {
   language: 'markup',
   init: function init(Prism) {
     Prism.languages.markup = {
@@ -36730,7 +37314,7 @@ function runParallel (tasks, cb) {
 
   var Stream
   try {
-    Stream = __nccwpck_require__(92413).Stream
+    Stream = (__nccwpck_require__(12781).Stream)
   } catch (ex) {
     Stream = function () {}
   }
@@ -36800,7 +37384,7 @@ function runParallel (tasks, cb) {
       typeof Buffer.isBuffer === 'function' &&
       Buffer.isBuffer(data)) {
       if (!this._decoder) {
-        var SD = __nccwpck_require__(24304).StringDecoder
+        var SD = (__nccwpck_require__(71576).StringDecoder)
         this._decoder = new SD('utf8')
       }
       data = this._decoder.write(data)
@@ -38180,11 +38764,11 @@ module.exports = /^#!(.*)/;
 // Note: since nyc uses this module to output coverage, any lines
 // that are in the direct sync flow of nyc's outputCoverage are
 // ignored, since we can never get coverage for them.
-var assert = __nccwpck_require__(42357)
+var assert = __nccwpck_require__(39491)
 var signals = __nccwpck_require__(63710)
 var isWin = /^win/i.test(process.platform)
 
-var EE = __nccwpck_require__(28614)
+var EE = __nccwpck_require__(82361)
 /* istanbul ignore if */
 if (typeof EE !== 'function') {
   EE = EE.EventEmitter
@@ -39198,7 +39782,7 @@ const stringWidth = string => {
 
 module.exports = stringWidth;
 // TODO: remove this in the next major version
-module.exports.default = stringWidth;
+module.exports["default"] = stringWidth;
 
 
 /***/ }),
@@ -39244,8 +39828,8 @@ module.exports = input => {
 
 "use strict";
 
-const os = __nccwpck_require__(12087);
-const tty = __nccwpck_require__(33867);
+const os = __nccwpck_require__(22037);
+const tty = __nccwpck_require__(76224);
 const hasFlag = __nccwpck_require__(31621);
 
 const {env} = process;
@@ -39692,13 +40276,13 @@ module.exports = __nccwpck_require__(54219);
 "use strict";
 
 
-var net = __nccwpck_require__(11631);
-var tls = __nccwpck_require__(4016);
-var http = __nccwpck_require__(15876);
-var https = __nccwpck_require__(57211);
-var events = __nccwpck_require__(28614);
-var assert = __nccwpck_require__(42357);
-var util = __nccwpck_require__(31669);
+var net = __nccwpck_require__(41808);
+var tls = __nccwpck_require__(24404);
+var http = __nccwpck_require__(13685);
+var https = __nccwpck_require__(95687);
+var events = __nccwpck_require__(82361);
+var assert = __nccwpck_require__(39491);
+var util = __nccwpck_require__(73837);
 
 
 exports.httpOverHttp = httpOverHttp;
@@ -40023,7 +40607,7 @@ const isWindows = process.platform === 'win32' ||
     process.env.OSTYPE === 'cygwin' ||
     process.env.OSTYPE === 'msys'
 
-const path = __nccwpck_require__(85622)
+const path = __nccwpck_require__(71017)
 const COLON = isWindows ? ';' : ':'
 const isexe = __nccwpck_require__(97126)
 
@@ -40218,7 +40802,7 @@ function wrappy (fn, cb) {
 
   builder = __nccwpck_require__(52958);
 
-  defaults = __nccwpck_require__(97251).defaults;
+  defaults = (__nccwpck_require__(97251).defaults);
 
   requiresCDATA = function(entry) {
     return typeof entry === "string" && (entry.indexOf('&') >= 0 || entry.indexOf('>') >= 0 || entry.indexOf('<') >= 0);
@@ -40433,15 +41017,15 @@ function wrappy (fn, cb) {
 
   sax = __nccwpck_require__(72043);
 
-  events = __nccwpck_require__(28614);
+  events = __nccwpck_require__(82361);
 
   bom = __nccwpck_require__(22624);
 
   processors = __nccwpck_require__(99236);
 
-  setImmediate = __nccwpck_require__(78213).setImmediate;
+  setImmediate = (__nccwpck_require__(39512).setImmediate);
 
-  defaults = __nccwpck_require__(97251).defaults;
+  defaults = (__nccwpck_require__(97251).defaults);
 
   isEmpty = function(thing) {
     return typeof thing === "object" && (thing != null) && Object.keys(thing).length === 0;
@@ -41622,7 +42206,7 @@ function wrappy (fn, cb) {
     extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
     hasProp = {}.hasOwnProperty;
 
-  isObject = __nccwpck_require__(85677).isObject;
+  isObject = (__nccwpck_require__(85677).isObject);
 
   XMLNode = __nccwpck_require__(67608);
 
@@ -41785,7 +42369,7 @@ function wrappy (fn, cb) {
     extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
     hasProp = {}.hasOwnProperty;
 
-  isObject = __nccwpck_require__(85677).isObject;
+  isObject = (__nccwpck_require__(85677).isObject);
 
   XMLNode = __nccwpck_require__(67608);
 
@@ -41835,7 +42419,7 @@ function wrappy (fn, cb) {
     extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
     hasProp = {}.hasOwnProperty;
 
-  isObject = __nccwpck_require__(85677).isObject;
+  isObject = (__nccwpck_require__(85677).isObject);
 
   XMLNode = __nccwpck_require__(67608);
 
@@ -42028,7 +42612,7 @@ function wrappy (fn, cb) {
     extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
     hasProp = {}.hasOwnProperty;
 
-  isPlainObject = __nccwpck_require__(85677).isPlainObject;
+  isPlainObject = (__nccwpck_require__(85677).isPlainObject);
 
   XMLDOMImplementation = __nccwpck_require__(78310);
 
@@ -44692,7 +45276,7 @@ function wrappy (fn, cb) {
   var NodeType, WriterState, XMLCData, XMLComment, XMLDTDAttList, XMLDTDElement, XMLDTDEntity, XMLDTDNotation, XMLDeclaration, XMLDocType, XMLDummy, XMLElement, XMLProcessingInstruction, XMLRaw, XMLText, XMLWriterBase, assign,
     hasProp = {}.hasOwnProperty;
 
-  assign = __nccwpck_require__(85677).assign;
+  assign = (__nccwpck_require__(85677).assign);
 
   NodeType = __nccwpck_require__(29267);
 
@@ -45210,113 +45794,22 @@ module.exports = {
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 const { commentTitle } = __nccwpck_require__(34570);
-const buildDetails = __nccwpck_require__(53840);
 
-const buildTrendValue = (value) => {
-  if (parseInt(value, 10) === 0) return value;
-
-  return `${value > 0 ? "+" : ""}${value} ${value < 0 ? "✅" : "❌"}`;
-};
-
-const buildDiff = (linesDiff, tokensDiff) => {
-  const trendLinesOutput = buildTrendValue(linesDiff);
-  const trendBranchesOutput = buildTrendValue(tokensDiff);
-
-  if (linesDiff !== 0 || tokensDiff !== 0) {
-    const deescriptionLines = `Percentage of duplicated lines diff: ${trendLinesOutput}`;
-    const deescriptionBranches = `Percentage of duplicated branches diff: ${trendBranchesOutput}`;
-    return `\n\n\n${deescriptionLines}\n${deescriptionBranches}`;
-  }
-
-  return "";
-};
-
-const buildBody = ({
-  linesDiff,
-  tokensDiff,
-  totalPercentage,
-  totalTokens,
-  clones,
-  changedFiles
-}) => {
+// eslint-disable-next-line no-unused-vars
+const buildBody = (statistic, clones) => {
   const header = commentTitle;
 
-  const totalPercentageOutput = `Total: <b>${totalPercentage}%</b>`;
-  const totalTokensOutput = `Total Branches: <b>${totalTokens}%</b>`;
+  const totalPercentageOutput = `Total Lines: <b>${statistic.total.lines}</b>`;
+  const totalDuplicationsOutput = `Duplications: <b>${statistic.total.duplicatedLines}</b>`;
 
-  const duplicationsDiff = buildDiff(linesDiff, tokensDiff);
-  const description = `${totalPercentageOutput}\n\n${totalTokensOutput}${duplicationsDiff}`;
-  const details = buildDetails(clones, changedFiles);
+  const description = `${totalPercentageOutput}\n\n${totalDuplicationsOutput}`;
 
-  const body = `<h3>${header}</h3>${description}${details}`;
+  const body = `<h3>${header}</h3>${description}`;
 
   return body;
 };
 
 module.exports = buildBody;
-
-
-/***/ }),
-
-/***/ 53840:
-/***/ ((module) => {
-
-const buildDuplicatesTable = (clones, changedFiles) => {
-  const duplicatesTable = clones.reduce(
-    (acc, { duplicationA, duplicationB }) => {
-      const buildLine = (duplication) => {
-        const path = duplication.sourceId;
-        const startLine = duplication.start.line;
-        const endLine = duplication.end.line;
-
-        return `${path}:${startLine}-${endLine}`;
-      };
-
-      // show report only with changed files
-      if (changedFiles.includes(duplicationB.sourceId)) {
-        const index = buildLine(duplicationB);
-        const defaultDuplicatedBlock = {
-          duplicates: []
-        };
-        const duplicatedBlock = acc[index] || defaultDuplicatedBlock;
-        duplicatedBlock.duplicates.push(buildLine(duplicationA));
-        acc[index] = duplicatedBlock;
-      }
-
-      return acc;
-    },
-    {}
-  );
-
-  return duplicatesTable;
-};
-
-const buildTableRow = (file, { duplicates }) =>
-  `<tr><td>${file}</td><td>${duplicates.join("\n")}</td></tr>`;
-
-const buildDetails = (clones, changedFiles) => {
-  if (clones.length === 0) return "";
-
-  const duplicatesTable = buildDuplicatesTable(clones, changedFiles);
-
-  const summary = "<summary>New code duplications found</summary>";
-
-  const tableHeader = "<tr><th>File</th><th>Clones</th></tr>";
-
-  // eslint-disable-next-line no-console
-  console.log("changedFiles", changedFiles);
-  console.log("duplicatesTable", duplicatesTable);
-  console.log("clones", clones);
-  const tableBody = Object.keys(duplicatesTable)
-    .map((key) => buildTableRow(key, duplicatesTable[key]))
-    .join("");
-
-  const table = `<table><tbody>${tableHeader}${tableBody}</tbody></table>`;
-
-  return `<details>${summary}${table}</details>`;
-};
-
-module.exports = buildDetails;
 
 
 /***/ }),
@@ -45406,24 +45899,28 @@ module.exports = findComment;
 
 const github = __nccwpck_require__(95438);
 
+const {
+  api: {
+    endpoints: { createGithubAccessToken }
+  }
+} = __nccwpck_require__(47127);
 const { getBarecheckGithubAppToken } = __nccwpck_require__(70006);
-const { createGithubAccessToken } = __nccwpck_require__(44030);
 
 let githubAccessToken = null;
 
-const createNewAccessToken = async (barecheckGithubAppToken) => {
-  const { token } = await createGithubAccessToken(barecheckGithubAppToken);
+const createNewAccessToken = async (githubAppToken) => {
+  const { token } = await createGithubAccessToken({ githubAppToken });
 
   return token;
 };
 
 const getOctokitClient = async () => {
-  const barecheckGithubAppToken = getBarecheckGithubAppToken();
-  if (!barecheckGithubAppToken)
+  const githubAppToken = getBarecheckGithubAppToken();
+  if (!githubAppToken)
     throw new Error("barecheck-github-app-token property is required");
 
-  if (!githubAccessToken)
-    githubAccessToken = await createNewAccessToken(barecheckGithubAppToken);
+  if (githubAccessToken === null)
+    githubAccessToken = await createNewAccessToken(githubAppToken);
 
   const octokit = github.getOctokit(githubAccessToken);
 
@@ -45480,61 +45977,6 @@ module.exports = {
 
 /***/ }),
 
-/***/ 44030:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const axios = __nccwpck_require__(96545);
-
-const { barecheckApiUrl } = __nccwpck_require__(34570);
-
-const makeRequest = async (query, variables) => {
-  const { data } = await axios.post(
-    barecheckApiUrl,
-    {
-      query,
-      variables
-    },
-    {
-      headers: {
-        "Content-Type": "application/json"
-      }
-    }
-  );
-
-  return data;
-};
-
-const createGithubAccessToken = async (githubAppToken) => {
-  const query = `mutation createGithubAccessToken($githubAppToken: String!) {
-    createGithubAccessToken(githubAppToken:$githubAppToken) {
-      success
-      code
-      token
-    }
-  }`;
-
-  const variables = {
-    githubAppToken
-  };
-
-  const { data } = await makeRequest(query, variables);
-
-  if (!data.createGithubAccessToken.success) {
-    throw new Error(
-      "Couldn't fetch access token for Github application. Check if you use the correct `BARECHECK_GITHUB_APP_TOKEN`"
-    );
-  }
-
-  return data.createGithubAccessToken;
-};
-
-module.exports = {
-  createGithubAccessToken
-};
-
-
-/***/ }),
-
 /***/ 22877:
 /***/ ((module) => {
 
@@ -45543,171 +45985,163 @@ module.exports = eval("require")("encoding");
 
 /***/ }),
 
-/***/ 20696:
+/***/ 39491:
 /***/ ((module) => {
 
 "use strict";
-module.exports = JSON.parse('{"name":"axios","version":"0.21.1","description":"Promise based HTTP client for the browser and node.js","main":"index.js","scripts":{"test":"grunt test && bundlesize","start":"node ./sandbox/server.js","build":"NODE_ENV=production grunt build","preversion":"npm test","version":"npm run build && grunt version && git add -A dist && git add CHANGELOG.md bower.json package.json","postversion":"git push && git push --tags","examples":"node ./examples/server.js","coveralls":"cat coverage/lcov.info | ./node_modules/coveralls/bin/coveralls.js","fix":"eslint --fix lib/**/*.js"},"repository":{"type":"git","url":"https://github.com/axios/axios.git"},"keywords":["xhr","http","ajax","promise","node"],"author":"Matt Zabriskie","license":"MIT","bugs":{"url":"https://github.com/axios/axios/issues"},"homepage":"https://github.com/axios/axios","devDependencies":{"bundlesize":"^0.17.0","coveralls":"^3.0.0","es6-promise":"^4.2.4","grunt":"^1.0.2","grunt-banner":"^0.6.0","grunt-cli":"^1.2.0","grunt-contrib-clean":"^1.1.0","grunt-contrib-watch":"^1.0.0","grunt-eslint":"^20.1.0","grunt-karma":"^2.0.0","grunt-mocha-test":"^0.13.3","grunt-ts":"^6.0.0-beta.19","grunt-webpack":"^1.0.18","istanbul-instrumenter-loader":"^1.0.0","jasmine-core":"^2.4.1","karma":"^1.3.0","karma-chrome-launcher":"^2.2.0","karma-coverage":"^1.1.1","karma-firefox-launcher":"^1.1.0","karma-jasmine":"^1.1.1","karma-jasmine-ajax":"^0.1.13","karma-opera-launcher":"^1.0.0","karma-safari-launcher":"^1.0.0","karma-sauce-launcher":"^1.2.0","karma-sinon":"^1.0.5","karma-sourcemap-loader":"^0.3.7","karma-webpack":"^1.7.0","load-grunt-tasks":"^3.5.2","minimist":"^1.2.0","mocha":"^5.2.0","sinon":"^4.5.0","typescript":"^2.8.1","url-search-params":"^0.10.0","webpack":"^1.13.1","webpack-dev-server":"^1.14.1"},"browser":{"./lib/adapters/http.js":"./lib/adapters/xhr.js"},"jsdelivr":"dist/axios.min.js","unpkg":"dist/axios.min.js","typings":"./index.d.ts","dependencies":{"follow-redirects":"^1.10.0"},"bundlesize":[{"path":"./dist/axios.min.js","threshold":"5kB"}]}');
+module.exports = require("assert");
 
 /***/ }),
 
-/***/ 42357:
+/***/ 14300:
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("assert");;
+module.exports = require("buffer");
 
 /***/ }),
 
-/***/ 64293:
+/***/ 32081:
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("buffer");;
+module.exports = require("child_process");
 
 /***/ }),
 
-/***/ 63129:
+/***/ 22057:
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("child_process");;
+module.exports = require("constants");
 
 /***/ }),
 
-/***/ 27619:
+/***/ 82361:
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("constants");;
+module.exports = require("events");
 
 /***/ }),
 
-/***/ 28614:
+/***/ 57147:
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("events");;
+module.exports = require("fs");
 
 /***/ }),
 
-/***/ 35747:
+/***/ 13685:
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("fs");;
+module.exports = require("http");
 
 /***/ }),
 
-/***/ 15876:
+/***/ 95687:
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("http");;
+module.exports = require("https");
 
 /***/ }),
 
-/***/ 57211:
+/***/ 41808:
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("https");;
+module.exports = require("net");
 
 /***/ }),
 
-/***/ 11631:
+/***/ 22037:
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("net");;
+module.exports = require("os");
 
 /***/ }),
 
-/***/ 12087:
+/***/ 71017:
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("os");;
+module.exports = require("path");
 
 /***/ }),
 
-/***/ 85622:
+/***/ 77282:
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("path");;
+module.exports = require("process");
 
 /***/ }),
 
-/***/ 61765:
+/***/ 12781:
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("process");;
+module.exports = require("stream");
 
 /***/ }),
 
-/***/ 92413:
+/***/ 71576:
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("stream");;
+module.exports = require("string_decoder");
 
 /***/ }),
 
-/***/ 24304:
+/***/ 39512:
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("string_decoder");;
+module.exports = require("timers");
 
 /***/ }),
 
-/***/ 78213:
+/***/ 24404:
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("timers");;
+module.exports = require("tls");
 
 /***/ }),
 
-/***/ 4016:
+/***/ 76224:
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("tls");;
+module.exports = require("tty");
 
 /***/ }),
 
-/***/ 33867:
+/***/ 57310:
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("tty");;
+module.exports = require("url");
 
 /***/ }),
 
-/***/ 78835:
+/***/ 73837:
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("url");;
+module.exports = require("util");
 
 /***/ }),
 
-/***/ 31669:
+/***/ 59796:
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("util");;
-
-/***/ }),
-
-/***/ 78761:
-/***/ ((module) => {
-
-"use strict";
-module.exports = require("zlib");;
+module.exports = require("zlib");
 
 /***/ })
 
@@ -45746,45 +46180,33 @@ module.exports = require("zlib");;
 /************************************************************************/
 /******/ 	/* webpack/runtime/compat */
 /******/ 	
-/******/ 	if (typeof __nccwpck_require__ !== 'undefined') __nccwpck_require__.ab = __dirname + "/";/************************************************************************/
+/******/ 	if (typeof __nccwpck_require__ !== 'undefined') __nccwpck_require__.ab = __dirname + "/";
+/******/ 	
+/************************************************************************/
 var __webpack_exports__ = {};
 // This entry need to be wrapped in an IIFE because it need to be isolated against other modules in the chunk.
 (() => {
 const core = __nccwpck_require__(42186);
-const { duplicates } = __nccwpck_require__(1728);
+const { detectClones } = __nccwpck_require__(47127);
 
 const { commentTitle } = __nccwpck_require__(34570);
 const buildBody = __nccwpck_require__(10681);
 const createOrUpdateComment = __nccwpck_require__(88646);
 
 async function main() {
-  const {
-    linesDiff,
-    tokensDiff,
-    totalPercentage,
-    totalTokens,
-    clones,
-    changedFiles
-  } = await duplicates.getMetrics("src", "origin/master");
+  try {
+    const { statistic, clones } = await detectClones(["./src"], {});
 
-  const body = buildBody({
-    linesDiff,
-    tokensDiff,
-    totalPercentage,
-    totalTokens,
-    clones,
-    changedFiles
-  });
+    const body = buildBody(statistic, clones);
 
-  await createOrUpdateComment(commentTitle, body);
+    await createOrUpdateComment(commentTitle, body);
+  } catch (err) {
+    core.info(err);
+    core.setFailed(err.message);
+  }
 }
 
-try {
-  main();
-} catch (err) {
-  core.info(err);
-  core.setFailed(err.message);
-}
+main();
 
 })();
 

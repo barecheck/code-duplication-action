@@ -233,13 +233,15 @@
     to-fast-properties "^2.0.0"
 
 "@barecheck/scanner@barecheck/scanner":
-  version "0.0.2"
-  resolved "https://codeload.github.com/barecheck/scanner/tar.gz/2e897c4f7940f78a8ed7458d80740eab370582ee"
+  version "0.1.1"
+  uid "4badffc68a3f51c68b5b70b605c9184ea025b490"
+  resolved "https://codeload.github.com/barecheck/scanner/tar.gz/4badffc68a3f51c68b5b70b605c9184ea025b490"
   dependencies:
-    "@jscpd/core" "^3.3.17"
-    "@jscpd/finder" "^3.3.26"
-    "@jscpd/tokenizer" "^3.3.24"
-    chalk "^4.1.1"
+    "@jscpd/core" "^3.4.1"
+    "@jscpd/finder" "^3.4.1"
+    "@jscpd/tokenizer" "^3.4.1"
+    axios "^0.24.0"
+    chalk "^4.1.2"
     commander "^8.0.0"
 
 "@eslint/eslintrc@^0.4.3":
@@ -287,35 +289,12 @@
   resolved "https://registry.yarnpkg.com/@istanbuljs/schema/-/schema-0.1.3.tgz#e45e384e4b8ec16bce2fd903af78450f6bf7ec98"
   integrity sha512-ZXRY4jNvVgSVQ8DL3LTcakaAtXwTVUxE81hslsyD2AtoXW/wVob10HkOJ1X/pAlcI7D+2YoZKg5do8G/w6RYgA==
 
-"@jscpd/core@^3.3.17":
-  version "3.3.17"
-  resolved "https://registry.yarnpkg.com/@jscpd/core/-/core-3.3.17.tgz#c9850df97738a281aa8cce94349609d90d442619"
-  integrity sha512-bE2sRVhfdWCeqHFeYW1fxDEahpkUH2/SAiuFBMmZ9+kdsbNZ7w0Ks5n3NU1Gkaqy725g/G6w+PdxVRdQ7qkf2A==
-  dependencies:
-    eventemitter3 "^4.0.4"
-
 "@jscpd/core@^3.4.1":
   version "3.4.1"
   resolved "https://registry.yarnpkg.com/@jscpd/core/-/core-3.4.1.tgz#8a8c6761331833928ad8a8239e264696a299aea5"
   integrity sha512-2lNQ7S5vDOgtpWyug3SOrRGxjawSJunXf/iFRWh56NHklYRY2UOFllKj6Ap5N+cDeOy86kHidy2KSCK6Mv39gQ==
   dependencies:
     eventemitter3 "^4.0.4"
-
-"@jscpd/finder@^3.3.26":
-  version "3.3.26"
-  resolved "https://registry.yarnpkg.com/@jscpd/finder/-/finder-3.3.26.tgz#92441904824b6b62fc9ef85d797e1b930efc782d"
-  integrity sha512-FGWIIhLELpeD2tkVjn+8QKnzX3nLAXkkcGTo+qWzEaqxvHsIGgeaP+TT3gHZM1Xm5eg6pb4j23nLY0h4UwEw0w==
-  dependencies:
-    "@jscpd/core" "^3.3.17"
-    "@jscpd/tokenizer" "^3.3.24"
-    blamer "^1.0.1"
-    bytes "^3.1.0"
-    cli-table3 "^0.6.0"
-    colors "^1.4.0"
-    fast-glob "^3.2.2"
-    fs-extra "^9.0.0"
-    markdown-table "^2.0.0"
-    pug "^3.0.1"
 
 "@jscpd/finder@^3.4.1":
   version "3.4.1"
@@ -332,15 +311,6 @@
     fs-extra "^9.0.0"
     markdown-table "^2.0.0"
     pug "^3.0.1"
-
-"@jscpd/tokenizer@^3.3.24":
-  version "3.3.24"
-  resolved "https://registry.yarnpkg.com/@jscpd/tokenizer/-/tokenizer-3.3.24.tgz#2548c78f13987725716c919c66e0e3342e563c35"
-  integrity sha512-YzD4RSimSCe/BdC6EQemWBnnb71R474FPlAzsQvuN5bfq7arakm81ihc7tApofWi323gZNc/Pw11e3zslD+mFQ==
-  dependencies:
-    "@jscpd/core" "^3.3.17"
-    reprism "^0.0.11"
-    spark-md5 "^3.0.1"
 
 "@jscpd/tokenizer@^3.4.1":
   version "3.4.1"
@@ -787,15 +757,7 @@ chalk@^2.0.0:
     escape-string-regexp "^1.0.5"
     supports-color "^5.3.0"
 
-chalk@^4.0.0, chalk@^4.1.0, chalk@^4.1.1:
-  version "4.1.1"
-  resolved "https://registry.yarnpkg.com/chalk/-/chalk-4.1.1.tgz#c80b3fab28bf6371e6863325eee67e618b77e6ad"
-  integrity sha512-diHzdDKxcU+bAsUboHLPEDQiw0qEe0qd7SYUn3HgcFlWgbDcfLGswOHYeGrHKzG9z6UYf01d9VFMfZxPM1xZSg==
-  dependencies:
-    ansi-styles "^4.1.0"
-    supports-color "^7.1.0"
-
-chalk@^4.1.2:
+chalk@^4.0.0, chalk@^4.1.0, chalk@^4.1.2:
   version "4.1.2"
   resolved "https://registry.yarnpkg.com/chalk/-/chalk-4.1.2.tgz#aac4e2b7734a740867aeb16bf02aad556a1e7a01"
   integrity sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA==

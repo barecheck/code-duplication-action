@@ -1490,6 +1490,2408 @@ exports.checkBypass = checkBypass;
 
 /***/ }),
 
+/***/ 55128:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const rabin_karp_1 = __nccwpck_require__(8105);
+const validators_1 = __nccwpck_require__(82218);
+const mode_1 = __nccwpck_require__(27899);
+// TODO replace to own event emitter
+const EventEmitter = __nccwpck_require__(11848);
+class Detector extends EventEmitter {
+    constructor(tokenizer, store, cloneValidators = [], options) {
+        super();
+        this.tokenizer = tokenizer;
+        this.store = store;
+        this.cloneValidators = cloneValidators;
+        this.options = options;
+        this.initCloneValidators();
+        this.algorithm = new rabin_karp_1.RabinKarp(this.options, this, this.cloneValidators);
+        this.options.minTokens = this.options.minTokens || 50;
+        this.options.maxLines = this.options.maxLines || 500;
+        this.options.minLines = this.options.minLines || 5;
+        this.options.mode = this.options.mode || mode_1.mild;
+    }
+    detect(id, text, format) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const tokenMaps = this.tokenizer.generateMaps(id, text, format, this.options);
+            // TODO change stores implementation
+            this.store.namespace(format);
+            const detect = (tokenMap, clones) => __awaiter(this, void 0, void 0, function* () {
+                if (tokenMap) {
+                    this.emit('START_DETECTION', { source: tokenMap });
+                    return this.algorithm
+                        .run(tokenMap, this.store)
+                        .then((clns) => {
+                        clones.push(...clns);
+                        const nextTokenMap = tokenMaps.pop();
+                        if (nextTokenMap) {
+                            return detect(nextTokenMap, clones);
+                        }
+                        else {
+                            return clones;
+                        }
+                    });
+                }
+            });
+            return detect(tokenMaps.pop(), []);
+        });
+    }
+    initCloneValidators() {
+        if (this.options.minLines || this.options.maxLines) {
+            this.cloneValidators.push(new validators_1.LinesLengthCloneValidator());
+        }
+    }
+}
+exports.Detector = Detector;
+//# sourceMappingURL=detector.js.map
+
+/***/ }),
+
+/***/ 84511:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+function __export(m) {
+    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
+}
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+__export(__nccwpck_require__(55128));
+__export(__nccwpck_require__(27899));
+__export(__nccwpck_require__(81070));
+__export(__nccwpck_require__(67799));
+__export(__nccwpck_require__(54628));
+//# sourceMappingURL=index.js.map
+
+/***/ }),
+
+/***/ 27899:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+function strict(token) {
+    return token.type !== 'ignore';
+}
+exports.strict = strict;
+function mild(token) {
+    return strict(token) && token.type !== 'empty' && token.type !== 'new_line';
+}
+exports.mild = mild;
+function weak(token) {
+    return mild(token)
+        && token.format !== 'comment'
+        && token.type !== 'comment'
+        && token.type !== 'block-comment';
+}
+exports.weak = weak;
+const MODES = {
+    mild,
+    strict,
+    weak,
+};
+function getModeByName(name) {
+    if (name in MODES) {
+        return MODES[name];
+    }
+    throw new Error(`Mode ${name} does not supported yet.`);
+}
+exports.getModeByName = getModeByName;
+function getModeHandler(mode) {
+    return typeof mode === 'string' ? getModeByName(mode) : mode;
+}
+exports.getModeHandler = getModeHandler;
+//# sourceMappingURL=mode.js.map
+
+/***/ }),
+
+/***/ 81070:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const mode_1 = __nccwpck_require__(27899);
+function getDefaultOptions() {
+    return {
+        executionId: new Date().toISOString(),
+        path: [process.cwd()],
+        mode: mode_1.getModeHandler('mild'),
+        minLines: 5,
+        maxLines: 1000,
+        maxSize: '100kb',
+        minTokens: 50,
+        output: './report',
+        reporters: ['console'],
+        ignore: [],
+        threshold: undefined,
+        formatsExts: {},
+        debug: false,
+        silent: false,
+        blame: false,
+        cache: true,
+        absolute: false,
+        noSymlinks: false,
+        skipLocal: false,
+        ignoreCase: false,
+        gitignore: false,
+        reportersOptions: {},
+        exitCode: 0,
+    };
+}
+exports.getDefaultOptions = getDefaultOptions;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getOption(name, options) {
+    const defaultOptions = getDefaultOptions();
+    return options ? options[name] || defaultOptions[name] : defaultOptions[name];
+}
+exports.getOption = getOption;
+//# sourceMappingURL=options.js.map
+
+/***/ }),
+
+/***/ 8105:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const validators_1 = __nccwpck_require__(82218);
+class RabinKarp {
+    constructor(options, eventEmitter, cloneValidators) {
+        this.options = options;
+        this.eventEmitter = eventEmitter;
+        this.cloneValidators = cloneValidators;
+    }
+    run(tokenMap, store) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return new Promise((resolve => {
+                let mapFrameInStore;
+                let clone = null;
+                const clones = [];
+                // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+                const loop = () => {
+                    const iteration = tokenMap.next();
+                    store
+                        .get(iteration.value.id)
+                        .then((mapFrameFromStore) => {
+                        mapFrameInStore = mapFrameFromStore;
+                        if (!clone) {
+                            clone = RabinKarp.createClone(tokenMap.getFormat(), iteration.value, mapFrameInStore);
+                        }
+                    }, () => {
+                        if (clone && this.validate(clone)) {
+                            clones.push(clone);
+                        }
+                        clone = null;
+                        if (iteration.value.id) {
+                            return store.set(iteration.value.id, iteration.value);
+                        }
+                    })
+                        .finally(() => {
+                        if (!iteration.done) {
+                            if (clone) {
+                                clone = RabinKarp.enlargeClone(clone, iteration.value, mapFrameInStore);
+                            }
+                            loop();
+                        }
+                        else {
+                            resolve(clones);
+                        }
+                    });
+                };
+                loop();
+            }));
+        });
+    }
+    validate(clone) {
+        const validation = validators_1.runCloneValidators(clone, this.options, this.cloneValidators);
+        if (validation.status) {
+            this.eventEmitter.emit('CLONE_FOUND', { clone });
+        }
+        else {
+            this.eventEmitter.emit('CLONE_SKIPPED', { clone, validation });
+        }
+        return validation.status;
+    }
+    static createClone(format, mapFrameA, mapFrameB) {
+        return {
+            format,
+            foundDate: new Date().getTime(),
+            duplicationA: {
+                sourceId: mapFrameA.sourceId,
+                start: mapFrameA.start.loc.start,
+                end: mapFrameA.end.loc.end,
+                range: [mapFrameA.start.range[0], mapFrameA.end.range[1]],
+            },
+            duplicationB: {
+                sourceId: mapFrameB.sourceId,
+                start: mapFrameB.start.loc.start,
+                end: mapFrameB.end.loc.end,
+                range: [mapFrameB.start.range[0], mapFrameB.end.range[1]],
+            },
+        };
+    }
+    static enlargeClone(clone, mapFrameA, mapFrameB) {
+        clone.duplicationA.range[1] = mapFrameA.end.range[1];
+        clone.duplicationA.end = mapFrameA.end.loc.end;
+        clone.duplicationB.range[1] = mapFrameB.end.range[1];
+        clone.duplicationB.end = mapFrameB.end.loc.end;
+        return clone;
+    }
+}
+exports.RabinKarp = RabinKarp;
+//# sourceMappingURL=rabin-karp.js.map
+
+/***/ }),
+
+/***/ 67799:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+class Statistic {
+    constructor(options) {
+        this.options = options;
+        this.statistic = {
+            detectionDate: new Date().toISOString(),
+            formats: {},
+            total: Statistic.getDefaultStatistic(),
+        };
+    }
+    static getDefaultStatistic() {
+        return {
+            lines: 0,
+            tokens: 0,
+            sources: 0,
+            clones: 0,
+            duplicatedLines: 0,
+            duplicatedTokens: 0,
+            percentage: 0,
+            percentageTokens: 0,
+            newDuplicatedLines: 0,
+            newClones: 0,
+        };
+    }
+    subscribe() {
+        return {
+            CLONE_FOUND: this.cloneFound.bind(this),
+            START_DETECTION: this.matchSource.bind(this),
+        };
+    }
+    getStatistic() {
+        return this.statistic;
+    }
+    cloneFound(payload) {
+        const { clone } = payload;
+        const id = clone.duplicationA.sourceId;
+        const id2 = clone.duplicationB.sourceId;
+        const linesCount = clone.duplicationA.end.line - clone.duplicationA.start.line;
+        const duplicatedTokens = clone.duplicationA.end.position - clone.duplicationA.start.position;
+        this.statistic.total.clones++;
+        this.statistic.total.duplicatedLines += linesCount;
+        this.statistic.total.duplicatedTokens += duplicatedTokens;
+        this.statistic.formats[clone.format].total.clones++;
+        this.statistic.formats[clone.format].total.duplicatedLines += linesCount;
+        this.statistic.formats[clone.format].total.duplicatedTokens += duplicatedTokens;
+        this.statistic.formats[clone.format].sources[id].clones++;
+        this.statistic.formats[clone.format].sources[id].duplicatedLines += linesCount;
+        this.statistic.formats[clone.format].sources[id].duplicatedTokens += duplicatedTokens;
+        this.statistic.formats[clone.format].sources[id2].clones++;
+        this.statistic.formats[clone.format].sources[id2].duplicatedLines += linesCount;
+        this.statistic.formats[clone.format].sources[id2].duplicatedTokens += duplicatedTokens;
+        this.updatePercentage(clone.format);
+    }
+    matchSource(payload) {
+        const { source } = payload;
+        const format = source.getFormat();
+        if (!(format in this.statistic.formats)) {
+            this.statistic.formats[format] = {
+                sources: {},
+                total: Statistic.getDefaultStatistic(),
+            };
+        }
+        this.statistic.total.sources++;
+        this.statistic.total.lines += source.getLinesCount();
+        this.statistic.total.tokens += source.getTokensCount();
+        this.statistic.formats[format].total.sources++;
+        this.statistic.formats[format].total.lines += source.getLinesCount();
+        this.statistic.formats[format].total.tokens += source.getTokensCount();
+        this.statistic.formats[format].sources[source.getId()] =
+            this.statistic.formats[format].sources[source.getId()] || Statistic.getDefaultStatistic();
+        this.statistic.formats[format].sources[source.getId()].sources = 1;
+        this.statistic.formats[format].sources[source.getId()].lines += source.getLinesCount();
+        this.statistic.formats[format].sources[source.getId()].tokens += source.getTokensCount();
+        this.updatePercentage(format);
+    }
+    updatePercentage(format) {
+        this.statistic.total.percentage = Statistic.calculatePercentage(this.statistic.total.lines, this.statistic.total.duplicatedLines);
+        this.statistic.total.percentageTokens = Statistic.calculatePercentage(this.statistic.total.tokens, this.statistic.total.duplicatedTokens);
+        this.statistic.formats[format].total.percentage = Statistic.calculatePercentage(this.statistic.formats[format].total.lines, this.statistic.formats[format].total.duplicatedLines);
+        this.statistic.formats[format].total.percentageTokens = Statistic.calculatePercentage(this.statistic.formats[format].total.tokens, this.statistic.formats[format].total.duplicatedTokens);
+        Object.entries(this.statistic.formats[format].sources).forEach(([id, stat]) => {
+            this.statistic.formats[format].sources[id].percentage = Statistic.calculatePercentage(stat.lines, stat.duplicatedLines);
+            this.statistic.formats[format].sources[id].percentageTokens = Statistic.calculatePercentage(stat.tokens, stat.duplicatedTokens);
+        });
+    }
+    static calculatePercentage(total, cloned) {
+        return total ? Math.round((10000 * cloned) / total) / 100 : 0.0;
+    }
+}
+exports.Statistic = Statistic;
+//# sourceMappingURL=statistic.js.map
+
+/***/ }),
+
+/***/ 54628:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+class MemoryStore {
+    constructor() {
+        this.values = {};
+    }
+    namespace(namespace) {
+        this._namespace = namespace;
+        this.values[namespace] = this.values[namespace] || {};
+    }
+    get(key) {
+        return new Promise((resolve, reject) => {
+            if (key in this.values[this._namespace]) {
+                resolve(this.values[this._namespace][key]);
+            }
+            else {
+                reject(new Error('not found'));
+            }
+        });
+    }
+    set(key, value) {
+        this.values[this._namespace][key] = value;
+        return Promise.resolve(value);
+    }
+    close() {
+        this.values = {};
+    }
+}
+exports.MemoryStore = MemoryStore;
+//# sourceMappingURL=memory.js.map
+
+/***/ }),
+
+/***/ 82218:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+function __export(m) {
+    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
+}
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+__export(__nccwpck_require__(52214));
+__export(__nccwpck_require__(43865));
+//# sourceMappingURL=index.js.map
+
+/***/ }),
+
+/***/ 52214:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+class LinesLengthCloneValidator {
+    validate(clone, options) {
+        const lines = clone.duplicationA.end.line - clone.duplicationA.start.line;
+        const status = lines >= options.minLines;
+        return {
+            status,
+            message: status ? ['ok'] : [`Lines of code less then limit (${lines} < ${options.minLines})`],
+        };
+    }
+}
+exports.LinesLengthCloneValidator = LinesLengthCloneValidator;
+//# sourceMappingURL=lines-length-clone.validator.js.map
+
+/***/ }),
+
+/***/ 43865:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+function runCloneValidators(clone, options, validators) {
+    return validators.reduce((acc, validator) => {
+        const res = validator.validate(clone, options);
+        return Object.assign(Object.assign({}, acc), { status: res.status && acc.status, message: res.message ? [...acc.message, ...res.message] : acc.message });
+    }, { status: true, message: [], clone });
+}
+exports.runCloneValidators = runCloneValidators;
+//# sourceMappingURL=validator.js.map
+
+/***/ }),
+
+/***/ 51908:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const core_1 = __nccwpck_require__(84511);
+const fast_glob_1 = __nccwpck_require__(43664);
+const tokenizer_1 = __nccwpck_require__(92080);
+const fs_extra_1 = __nccwpck_require__(5630);
+const safe_1 = __nccwpck_require__(41997);
+const fs_1 = __nccwpck_require__(57147);
+const bytes = __nccwpck_require__(86966);
+function isFile(path) {
+    try {
+        const stat = fs_1.lstatSync(path);
+        return stat.isFile();
+    }
+    catch (e) {
+        // lstatSync throws an error if path doesn't exist
+        return false;
+    }
+}
+function skipNotSupportedFormats(options) {
+    return (entry) => {
+        const { path } = entry;
+        const format = tokenizer_1.getFormatByFile(path, options.formatsExts);
+        const shouldNotSkip = format && options.format && options.format.includes(format);
+        if ((options.debug || options.verbose) && !shouldNotSkip) {
+            console.log(`File ${path} skipped! Format "${format}" does not included to supported formats.`);
+        }
+        return shouldNotSkip;
+    };
+}
+function skipBigFiles(options) {
+    return (entry) => {
+        const { stats, path } = entry;
+        const shouldSkip = bytes.parse(stats.size) > bytes.parse(core_1.getOption('maxSize', options));
+        if (options.debug && shouldSkip) {
+            console.log(`File ${path} skipped! Size more then limit (${bytes(stats.size)} > ${core_1.getOption('maxSize', options)})`);
+        }
+        return !shouldSkip;
+    };
+}
+function skipFilesIfLinesOfContentNotInLimits(options) {
+    return (entry) => {
+        const { path, content } = entry;
+        const lines = content.split('\n').length;
+        const minLines = core_1.getOption('minLines', options);
+        const maxLines = core_1.getOption('maxLines', options);
+        if (lines < minLines || lines > maxLines) {
+            if ((options.debug || options.verbose)) {
+                console.log(safe_1.grey(`File ${path} skipped! Code lines=${lines} not in limits (${minLines}:${maxLines})`));
+            }
+            return false;
+        }
+        return true;
+    };
+}
+function addContentToEntry(entry) {
+    const { path } = entry;
+    const content = fs_extra_1.readFileSync(path).toString();
+    return Object.assign(Object.assign({}, entry), { content });
+}
+function getFilesToDetect(options) {
+    const pattern = options.pattern || '**/*';
+    const patterns = options.path.map((path) => {
+        if (isFile(path)) {
+            return path;
+        }
+        return path.substr(path.length - 1) === '/' ? `${path}${pattern}` : `${path}/${pattern}`;
+    });
+    return fast_glob_1.sync(patterns, {
+        ignore: options.ignore,
+        onlyFiles: true,
+        dot: true,
+        stats: true,
+        absolute: options.absolute,
+        followSymbolicLinks: !options.noSymlinks,
+    })
+        .filter(skipNotSupportedFormats(options))
+        .filter(skipBigFiles(options))
+        .map(addContentToEntry)
+        .filter(skipFilesIfLinesOfContentNotInLimits(options));
+}
+exports.getFilesToDetect = getFilesToDetect;
+//# sourceMappingURL=files.js.map
+
+/***/ }),
+
+/***/ 74574:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const blamer_1 = __nccwpck_require__(56781);
+class BlamerHook {
+    process(clones) {
+        return Promise.all(clones.map((clone) => BlamerHook.blameLines(clone)));
+    }
+    static blameLines(clone) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const blamer = new blamer_1.default();
+            const blamedFileA = yield blamer.blameByFile(clone.duplicationA.sourceId);
+            const blamedFileB = yield blamer.blameByFile(clone.duplicationB.sourceId);
+            clone.duplicationA.blame = BlamerHook.getBlamedLines(blamedFileA, clone.duplicationA.start.line, clone.duplicationA.end.line);
+            clone.duplicationB.blame = BlamerHook.getBlamedLines(blamedFileB, clone.duplicationB.start.line, clone.duplicationB.end.line);
+            return clone;
+        });
+    }
+    static getBlamedLines(blamedFiles, start, end) {
+        // TODO rewrite the method
+        const [file] = Object.keys(blamedFiles);
+        const result = {};
+        Object.keys(blamedFiles[file])
+            .filter((lineNumber) => {
+            return Number(lineNumber) >= start && Number(lineNumber) <= end;
+        })
+            .map((lineNumber) => blamedFiles[file][lineNumber])
+            .forEach((info) => {
+            result[info.line] = info;
+        });
+        return result;
+    }
+}
+exports.BlamerHook = BlamerHook;
+//# sourceMappingURL=blamer.js.map
+
+/***/ }),
+
+/***/ 44810:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const fs_1 = __nccwpck_require__(57147);
+class FragmentsHook {
+    process(clones) {
+        return Promise.all(clones.map((clone) => FragmentsHook.addFragments(clone)));
+    }
+    static addFragments(clone) {
+        const codeA = fs_1.readFileSync(clone.duplicationA.sourceId).toString();
+        const codeB = fs_1.readFileSync(clone.duplicationB.sourceId).toString();
+        clone.duplicationA.fragment = codeA.substring(clone.duplicationA.range[0], clone.duplicationA.range[1]);
+        clone.duplicationB.fragment = codeB.substring(clone.duplicationB.range[0], clone.duplicationB.range[1]);
+        return clone;
+    }
+}
+exports.FragmentsHook = FragmentsHook;
+//# sourceMappingURL=fragment.js.map
+
+/***/ }),
+
+/***/ 88131:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+function __export(m) {
+    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
+}
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+__export(__nccwpck_require__(74574));
+__export(__nccwpck_require__(44810));
+//# sourceMappingURL=index.js.map
+
+/***/ }),
+
+/***/ 88241:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const core_1 = __nccwpck_require__(84511);
+const tokenizer_1 = __nccwpck_require__(92080);
+const validators_1 = __nccwpck_require__(20733);
+class InFilesDetector {
+    constructor(tokenizer, store, statistic, options) {
+        this.tokenizer = tokenizer;
+        this.store = store;
+        this.statistic = statistic;
+        this.options = options;
+        this.reporters = [];
+        this.subscribes = [];
+        this.postHooks = [];
+        this.registerSubscriber(this.statistic);
+    }
+    registerReporter(reporter) {
+        this.reporters.push(reporter);
+    }
+    registerSubscriber(subscriber) {
+        this.subscribes.push(subscriber);
+    }
+    registerHook(hook) {
+        this.postHooks.push(hook);
+    }
+    detect(fls) {
+        const files = fls.filter((f) => !!f);
+        if (files.length === 0) {
+            return Promise.resolve([]);
+        }
+        const options = this.options;
+        const hooks = [...this.postHooks];
+        const store = this.store;
+        const validators = [];
+        if (options.skipLocal) {
+            validators.push(new validators_1.SkipLocalValidator());
+        }
+        const detector = new core_1.Detector(this.tokenizer, store, validators, options);
+        this.subscribes.forEach((listener) => {
+            Object
+                .entries(listener.subscribe())
+                .map(([event, handler]) => detector.on(event, handler));
+        });
+        const detect = (entry, clones = []) => {
+            const { path, content } = entry;
+            const format = tokenizer_1.getFormatByFile(path, options.formatsExts);
+            return detector
+                .detect(path, content, format)
+                .then((clns) => {
+                if (clns) {
+                    clones.push(...clns);
+                }
+                const file = files.pop();
+                if (file) {
+                    return detect(file, clones);
+                }
+                return clones;
+            });
+        };
+        const processHooks = (hook, detectedClones) => {
+            return hook
+                .process(detectedClones)
+                .then((clones) => {
+                const nextHook = hooks.pop();
+                if (nextHook) {
+                    return processHooks(nextHook, clones);
+                }
+                return clones;
+            });
+        };
+        return detect(files.pop())
+            .then((clones) => {
+            const hook = hooks.pop();
+            if (hook) {
+                return processHooks(hook, clones);
+            }
+            return clones;
+        })
+            .then((clones) => {
+            const statistic = this.statistic.getStatistic();
+            this.reporters.forEach((reporter) => {
+                reporter.report(clones, statistic);
+            });
+            return clones;
+        });
+    }
+}
+exports.InFilesDetector = InFilesDetector;
+//# sourceMappingURL=in-files-detector.js.map
+
+/***/ }),
+
+/***/ 39148:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+function __export(m) {
+    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
+}
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+__export(__nccwpck_require__(88241));
+__export(__nccwpck_require__(51908));
+__export(__nccwpck_require__(88131));
+__export(__nccwpck_require__(48812));
+__export(__nccwpck_require__(16872));
+__export(__nccwpck_require__(20733));
+__export(__nccwpck_require__(43465));
+//# sourceMappingURL=index.js.map
+
+/***/ }),
+
+/***/ 57959:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const reports_1 = __nccwpck_require__(42083);
+const clone_found_1 = __nccwpck_require__(17304);
+const safe_1 = __nccwpck_require__(41997);
+const Table = __nccwpck_require__(2101);
+const TABLE_OPTIONS = {
+    chars: {
+        top: '',
+        'top-mid': '',
+        'top-left': '',
+        'top-right': '',
+        bottom: '',
+        'bottom-mid': '',
+        'bottom-left': '',
+        'bottom-right': '',
+        left: '',
+        'left-mid': '',
+        mid: '',
+        'mid-mid': '',
+        right: '',
+        'right-mid': '',
+        middle: '│',
+    },
+};
+class ConsoleFullReporter {
+    constructor(options) {
+        this.options = options;
+    }
+    report(clones) {
+        clones.forEach((clone) => {
+            this.cloneFullFound(clone);
+        });
+        console.log(safe_1.grey(`Found ${clones.length} clones.`));
+    }
+    cloneFullFound(clone) {
+        const table = new Table(TABLE_OPTIONS);
+        clone_found_1.cloneFound(clone, this.options);
+        clone.duplicationA.fragment.split('\n').forEach((line, position) => {
+            (table).push(reports_1.generateLine(clone, position, line));
+        });
+        console.log(table.toString());
+        console.log('');
+    }
+}
+exports.ConsoleFullReporter = ConsoleFullReporter;
+//# sourceMappingURL=console-full.js.map
+
+/***/ }),
+
+/***/ 94513:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const safe_1 = __nccwpck_require__(41997);
+const reports_1 = __nccwpck_require__(42083);
+const Table = __nccwpck_require__(2101);
+class ConsoleReporter {
+    constructor(options) {
+        this.options = options;
+    }
+    report(clones, statistic = undefined) {
+        if (statistic && !this.options.silent) {
+            const table = new Table({
+                head: ['Format', 'Files analyzed', 'Total lines', 'Total tokens', 'Clones found', 'Duplicated lines', 'Duplicated tokens'],
+            });
+            Object.keys(statistic.formats)
+                .filter((format) => statistic.formats[format].sources)
+                .forEach((format) => {
+                table.push(reports_1.convertStatisticToArray(format, statistic.formats[format].total));
+            });
+            table.push(reports_1.convertStatisticToArray(safe_1.bold('Total:'), statistic.total));
+            console.log(table.toString());
+            console.log(safe_1.grey(`Found ${clones.length} clones.`));
+        }
+    }
+}
+exports.ConsoleReporter = ConsoleReporter;
+//# sourceMappingURL=console.js.map
+
+/***/ }),
+
+/***/ 54038:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const core_1 = __nccwpck_require__(84511);
+const fs_extra_1 = __nccwpck_require__(5630);
+const safe_1 = __nccwpck_require__(41997);
+const path_1 = __nccwpck_require__(71017);
+const reports_1 = __nccwpck_require__(42083);
+class CSVReporter {
+    constructor(options) {
+        this.options = options;
+    }
+    report(clones, statistic) {
+        const report = [
+            ['Format', 'Files analyzed', 'Total lines', 'Total tokens', 'Clones found', 'Duplicated lines', 'Duplicated tokens'],
+            ...Object.keys(statistic.formats).map((format) => reports_1.convertStatisticToArray(format, statistic.formats[format].total)),
+            reports_1.convertStatisticToArray('Total:', statistic.total)
+        ].map((arr) => arr.join(',')).join('\n');
+        fs_extra_1.ensureDirSync(core_1.getOption('output', this.options));
+        fs_extra_1.writeFileSync(core_1.getOption('output', this.options) + '/jscpd-report.csv', report);
+        console.log(safe_1.green(`CSV report saved to ${path_1.join(this.options.output, 'jscpd-report.csv')}`));
+    }
+}
+exports.CSVReporter = CSVReporter;
+//# sourceMappingURL=csv.js.map
+
+/***/ }),
+
+/***/ 16872:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+function __export(m) {
+    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
+}
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+__export(__nccwpck_require__(94513));
+__export(__nccwpck_require__(57959));
+__export(__nccwpck_require__(78634));
+__export(__nccwpck_require__(54038));
+__export(__nccwpck_require__(91708));
+__export(__nccwpck_require__(9319));
+__export(__nccwpck_require__(87850));
+__export(__nccwpck_require__(42639));
+__export(__nccwpck_require__(39774));
+//# sourceMappingURL=index.js.map
+
+/***/ }),
+
+/***/ 78634:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const fs_extra_1 = __nccwpck_require__(5630);
+const core_1 = __nccwpck_require__(84511);
+const reports_1 = __nccwpck_require__(42083);
+const safe_1 = __nccwpck_require__(41997);
+const path_1 = __nccwpck_require__(71017);
+class JsonReporter {
+    constructor(options) {
+        this.options = options;
+    }
+    generateJson(clones, statistics) {
+        return {
+            statistics,
+            duplicates: clones.map(clone => this.cloneFound(clone))
+        };
+    }
+    report(clones, statistic) {
+        const json = this.generateJson(clones, statistic);
+        fs_extra_1.ensureDirSync(core_1.getOption('output', this.options));
+        fs_extra_1.writeFileSync(core_1.getOption('output', this.options) + '/jscpd-report.json', JSON.stringify(json, null, '  '));
+        console.log(safe_1.green(`JSON report saved to ${path_1.join(this.options.output, 'jscpd-report.json')}`));
+    }
+    cloneFound(clone) {
+        const startLineA = clone.duplicationA.start.line;
+        const endLineA = clone.duplicationA.end.line;
+        const startLineB = clone.duplicationB.start.line;
+        const endLineB = clone.duplicationB.end.line;
+        return {
+            format: clone.format,
+            lines: endLineA - startLineA + 1,
+            fragment: clone.duplicationA.fragment,
+            tokens: 0,
+            firstFile: {
+                name: reports_1.getPath(clone.duplicationA.sourceId, this.options),
+                start: startLineA,
+                end: endLineA,
+                startLoc: clone.duplicationA.start,
+                endLoc: clone.duplicationA.end,
+                blame: clone.duplicationA.blame,
+            },
+            secondFile: {
+                name: reports_1.getPath(clone.duplicationB.sourceId, this.options),
+                start: startLineB,
+                end: endLineB,
+                startLoc: clone.duplicationB.start,
+                endLoc: clone.duplicationB.end,
+                blame: clone.duplicationB.blame,
+            },
+        };
+    }
+}
+exports.JsonReporter = JsonReporter;
+//# sourceMappingURL=json.js.map
+
+/***/ }),
+
+/***/ 91708:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const core_1 = __nccwpck_require__(84511);
+const fs_extra_1 = __nccwpck_require__(5630);
+const safe_1 = __nccwpck_require__(41997);
+const path_1 = __nccwpck_require__(71017);
+const reports_1 = __nccwpck_require__(42083);
+const table = __nccwpck_require__(41062);
+class MarkdownReporter {
+    constructor(options) {
+        this.options = options;
+    }
+    report(clones, statistic) {
+        const report = `
+# Copy/paste detection report
+
+> Duplications detection: Found ${clones.length} exact clones with ${statistic.total.duplicatedLines}(${statistic.total.percentage}%) duplicated lines in ${statistic.total.sources} (${Object.keys(statistic.formats).length} formats) files.
+
+${table([
+            ['Format', 'Files analyzed', 'Total lines', 'Total tokens', 'Clones found', 'Duplicated lines', 'Duplicated tokens'],
+            ...Object.keys(statistic.formats).map((format) => reports_1.convertStatisticToArray(format, statistic.formats[format].total)),
+            reports_1.convertStatisticToArray('Total:', statistic.total).map(item => `**${item}**`)
+        ])}
+`;
+        fs_extra_1.ensureDirSync(core_1.getOption('output', this.options));
+        fs_extra_1.writeFileSync(core_1.getOption('output', this.options) + '/jscpd-report.md', report);
+        console.log(safe_1.green(`Markdown report saved to ${path_1.join(this.options.output, 'jscpd-report.md')}`));
+    }
+}
+exports.MarkdownReporter = MarkdownReporter;
+//# sourceMappingURL=markdown.js.map
+
+/***/ }),
+
+/***/ 87850:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const safe_1 = __nccwpck_require__(41997);
+class SilentReporter {
+    report(clones, statistic) {
+        if (statistic) {
+            console.log(`Duplications detection: Found ${safe_1.bold(clones.length.toString())} ` +
+                `exact clones with ${safe_1.bold(statistic.total.duplicatedLines.toString())}(${statistic.total.percentage}%) ` +
+                `duplicated lines in ${safe_1.bold(statistic.total.sources.toString())} ` +
+                `(${Object.keys(statistic.formats).length} formats) files.`);
+        }
+    }
+}
+exports.SilentReporter = SilentReporter;
+//# sourceMappingURL=silent.js.map
+
+/***/ }),
+
+/***/ 42639:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const safe_1 = __nccwpck_require__(41997);
+class ThresholdReporter {
+    constructor(options) {
+        this.options = options;
+    }
+    report(clones, statistic) {
+        if (statistic && this.options.threshold !== undefined && this.options.threshold < statistic.total.percentage) {
+            const message = `ERROR: jscpd found too many duplicates (${statistic.total.percentage}%) over threshold (${this.options.threshold}%)`;
+            console.error(safe_1.red(message));
+            throw new Error(message);
+        }
+    }
+}
+exports.ThresholdReporter = ThresholdReporter;
+//# sourceMappingURL=threshold.js.map
+
+/***/ }),
+
+/***/ 39774:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const reports_1 = __nccwpck_require__(42083);
+class XcodeReporter {
+    constructor(options) {
+        this.options = options;
+    }
+    report(clones) {
+        clones.forEach((clone) => {
+            this.cloneFound(clone);
+        });
+        console.log(`Found ${clones.length} clones.`);
+    }
+    cloneFound(clone) {
+        const pathA = reports_1.getPath(clone.duplicationA.sourceId, Object.assign(Object.assign({}, this.options), { absolute: true }));
+        const pathB = reports_1.getPath(clone.duplicationB.sourceId, this.options);
+        const startLineA = clone.duplicationA.start.line;
+        const characterA = clone.duplicationA.start.column;
+        const endLineA = clone.duplicationA.end.line;
+        const startLineB = clone.duplicationB.start.line;
+        const endLineB = clone.duplicationB.end.line;
+        console.log(`${pathA}:${startLineA}:${characterA}: warning: Found ${endLineA - startLineA} lines (${startLineA}-${endLineA}) duplicated on file ${pathB} (${startLineB}-${endLineB})`);
+    }
+}
+exports.XcodeReporter = XcodeReporter;
+//# sourceMappingURL=xcode.js.map
+
+/***/ }),
+
+/***/ 9319:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const fs_1 = __nccwpck_require__(57147);
+const fs_extra_1 = __nccwpck_require__(5630);
+const core_1 = __nccwpck_require__(84511);
+const reports_1 = __nccwpck_require__(42083);
+const safe_1 = __nccwpck_require__(41997);
+const path_1 = __nccwpck_require__(71017);
+class XmlReporter {
+    constructor(options) {
+        this.options = options;
+    }
+    report(clones) {
+        let xmlDoc = '<?xml version="1.0" encoding="UTF-8" ?>';
+        xmlDoc += '<pmd-cpd>';
+        clones.forEach((clone) => {
+            xmlDoc = `${xmlDoc}
+      <duplication lines="${clone.duplicationA.end.line - clone.duplicationA.start.line}">
+            <file path="${reports_1.escapeXml(reports_1.getPath(clone.duplicationA.sourceId, this.options))}" line="${clone.duplicationA.start.line}">
+              <codefragment><![CDATA[${clone.duplicationA.fragment.replace(/]]>/i, 'CDATA_END')}]]></codefragment>
+            </file>
+            <file path="${reports_1.escapeXml(reports_1.getPath(clone.duplicationB.sourceId, this.options))}" line="${clone.duplicationB.start.line}">
+              <codefragment><![CDATA[${clone.duplicationB.fragment.replace(/]]>/i, 'CDATA_END')}]]></codefragment>
+            </file>
+            <codefragment><![CDATA[${clone.duplicationA.fragment.replace(/]]>/i, 'CDATA_END')}]]></codefragment>
+        </duplication>
+      `;
+        });
+        xmlDoc += '</pmd-cpd>';
+        fs_extra_1.ensureDirSync(core_1.getOption('output', this.options));
+        fs_1.writeFileSync(core_1.getOption('output', this.options) + '/jscpd-report.xml', xmlDoc);
+        console.log(safe_1.green(`XML report saved to ${path_1.join(this.options.output, 'jscpd-report.xml')}`));
+    }
+}
+exports.XmlReporter = XmlReporter;
+//# sourceMappingURL=xml.js.map
+
+/***/ }),
+
+/***/ 48812:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+function __export(m) {
+    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
+}
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+__export(__nccwpck_require__(14941));
+__export(__nccwpck_require__(10865));
+//# sourceMappingURL=index.js.map
+
+/***/ }),
+
+/***/ 14941:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const clone_found_1 = __nccwpck_require__(17304);
+class ProgressSubscriber {
+    constructor(options) {
+        this.options = options;
+    }
+    subscribe() {
+        return {
+            CLONE_FOUND: (payload) => clone_found_1.cloneFound(payload.clone, this.options),
+        };
+    }
+}
+exports.ProgressSubscriber = ProgressSubscriber;
+//# sourceMappingURL=progress.js.map
+
+/***/ }),
+
+/***/ 10865:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const safe_1 = __nccwpck_require__(41997);
+class VerboseSubscriber {
+    constructor(options) {
+        this.options = options;
+    }
+    subscribe() {
+        return {
+            'CLONE_FOUND': (payload) => {
+                const { clone } = payload;
+                console.log(safe_1.yellow('CLONE_FOUND'));
+                console.log(safe_1.grey(JSON.stringify(clone, null, '\t')));
+            },
+            'CLONE_SKIPPED': (payload) => {
+                const { validation } = payload;
+                console.log(safe_1.yellow('CLONE_SKIPPED'));
+                console.log(safe_1.grey('Clone skipped: ' + validation.message.join(' ')));
+            },
+            'START_DETECTION': (payload) => {
+                const { source } = payload;
+                console.log(safe_1.yellow('START_DETECTION'));
+                console.log(safe_1.grey('Start detection for source id=' + source.getId() + ' format=' + source.getFormat()));
+            },
+        };
+    }
+}
+exports.VerboseSubscriber = VerboseSubscriber;
+//# sourceMappingURL=verbose.js.map
+
+/***/ }),
+
+/***/ 17304:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const safe_1 = __nccwpck_require__(41997);
+const reports_1 = __nccwpck_require__(42083);
+function cloneFound(clone, options) {
+    const { duplicationA, duplicationB, format, isNew } = clone;
+    console.log('Clone found (' + format + '):' + (isNew ? safe_1.red('*') : ''));
+    console.log(` - ${reports_1.getPathConsoleString(duplicationA.sourceId, options)} [${reports_1.getSourceLocation(duplicationA.start, duplicationA.end)}] (${duplicationA.end.line - duplicationA.start.line} lines${duplicationA.end.position ? ', ' + (duplicationA.end.position - duplicationA.start.position) + ' tokens' : ''})`);
+    console.log(`   ${reports_1.getPathConsoleString(duplicationB.sourceId, options)} [${reports_1.getSourceLocation(duplicationB.start, duplicationB.end)}]`);
+    console.log('');
+}
+exports.cloneFound = cloneFound;
+//# sourceMappingURL=clone-found.js.map
+
+/***/ }),
+
+/***/ 43465:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+function parseFormatsExtensions(extensions = '') {
+    const result = {};
+    if (!extensions) {
+        return undefined;
+    }
+    extensions.split(';').forEach((format) => {
+        const pair = format.split(':');
+        result[pair[0]] = pair[1].split(',');
+    });
+    return result;
+}
+exports.parseFormatsExtensions = parseFormatsExtensions;
+//# sourceMappingURL=options.js.map
+
+/***/ }),
+
+/***/ 42083:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const path_1 = __nccwpck_require__(71017);
+const process_1 = __nccwpck_require__(77282);
+const safe_1 = __nccwpck_require__(41997);
+exports.compareDates = (firstDate, secondDate) => {
+    const first = new Date(firstDate);
+    const second = new Date(secondDate);
+    switch (true) {
+        case first < second:
+            return '=>';
+        case first > second:
+            return '<=';
+        default:
+            return '==';
+    }
+};
+function escapeXml(unsafe) {
+    return unsafe.replace(/[<>&'"]/g, function (c) {
+        switch (c) {
+            case '<': return '&lt;';
+            case '>': return '&gt;';
+            case '&': return '&amp;';
+            case '\'': return '&apos;';
+            case '"': return '&quot;';
+        }
+    });
+}
+exports.escapeXml = escapeXml;
+function getPath(path, options) {
+    return options.absolute ? path : path_1.relative(process_1.cwd(), path);
+}
+exports.getPath = getPath;
+function getPathConsoleString(path, options) {
+    return safe_1.bold(safe_1.green(getPath(path, options)));
+}
+exports.getPathConsoleString = getPathConsoleString;
+function getSourceLocation(start, end) {
+    return `${start.line}:${start.column} - ${end.line}:${end.column}`;
+}
+exports.getSourceLocation = getSourceLocation;
+function generateLine(clone, position, line) {
+    const lineNumberA = (clone.duplicationA.start.line + position).toString();
+    const lineNumberB = (clone.duplicationB.start.line + position).toString();
+    if (clone.duplicationA.blame && clone.duplicationB.blame) {
+        return [
+            lineNumberA,
+            clone.duplicationA.blame[lineNumberA] ? clone.duplicationA.blame[lineNumberA].author : '',
+            clone.duplicationA.blame[lineNumberA] && clone.duplicationB.blame[lineNumberB]
+                ? exports.compareDates(clone.duplicationA.blame[lineNumberA].date, clone.duplicationB.blame[lineNumberB].date)
+                : '',
+            lineNumberB,
+            clone.duplicationB.blame[lineNumberB] ? clone.duplicationB.blame[lineNumberB].author : '',
+            safe_1.grey(line),
+        ];
+    }
+    else {
+        return [lineNumberA, lineNumberB, safe_1.grey(line)];
+    }
+}
+exports.generateLine = generateLine;
+function convertStatisticToArray(format, statistic) {
+    return [
+        format,
+        `${statistic.sources}`,
+        `${statistic.lines}`,
+        `${statistic.tokens}`,
+        `${statistic.clones}`,
+        `${statistic.duplicatedLines} (${statistic.percentage}%)`,
+        `${statistic.duplicatedTokens} (${statistic.percentageTokens}%)`,
+    ];
+}
+exports.convertStatisticToArray = convertStatisticToArray;
+//# sourceMappingURL=reports.js.map
+
+/***/ }),
+
+/***/ 20733:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+function __export(m) {
+    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
+}
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+__export(__nccwpck_require__(69653));
+//# sourceMappingURL=index.js.map
+
+/***/ }),
+
+/***/ 69653:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const core_1 = __nccwpck_require__(84511);
+const path_1 = __nccwpck_require__(71017);
+class SkipLocalValidator {
+    validate(clone, options) {
+        const status = !this.shouldSkipClone(clone, options);
+        return {
+            status,
+            clone,
+            message: [
+                `Sources of duplication located in same local folder (${clone.duplicationA.sourceId}, ${clone.duplicationB.sourceId})`
+            ]
+        };
+    }
+    shouldSkipClone(clone, options) {
+        const path = core_1.getOption('path', options);
+        return path.some((dir) => SkipLocalValidator.isRelative(clone.duplicationA.sourceId, dir) && SkipLocalValidator.isRelative(clone.duplicationB.sourceId, dir));
+    }
+    static isRelative(file, path) {
+        const rel = path_1.relative(path, file);
+        return rel !== '' && !rel.startsWith('..') && !path_1.isAbsolute(rel);
+    }
+}
+exports.SkipLocalValidator = SkipLocalValidator;
+//# sourceMappingURL=skip-local.validator.js.map
+
+/***/ }),
+
+/***/ 85049:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const path_1 = __nccwpck_require__(71017);
+exports.FORMATS = {
+    abap: {
+        exts: [],
+    },
+    actionscript: {
+        exts: ['as'],
+    },
+    ada: {
+        exts: ['ada'],
+    },
+    apacheconf: {
+        exts: [],
+    },
+    apl: {
+        exts: ['apl'],
+    },
+    applescript: {
+        exts: [],
+    },
+    arduino: {
+        exts: [],
+    },
+    arff: {
+        exts: [],
+    },
+    asciidoc: {
+        exts: [],
+    },
+    asm6502: {
+        exts: [],
+    },
+    aspnet: {
+        exts: ['asp', 'aspx'],
+    },
+    autohotkey: {
+        exts: [],
+    },
+    autoit: {
+        exts: [],
+    },
+    bash: {
+        exts: ['sh', 'ksh', 'bash'],
+    },
+    basic: {
+        exts: ['bas'],
+    },
+    batch: {
+        exts: [],
+    },
+    bison: {
+        exts: [],
+    },
+    brainfuck: {
+        exts: ['b', 'bf'],
+    },
+    bro: {
+        exts: [],
+    },
+    c: {
+        exts: ['c', 'z80'],
+    },
+    'c-header': {
+        exts: ['h'],
+        parent: 'c',
+    },
+    clike: {
+        exts: [],
+    },
+    clojure: {
+        exts: ['cljs', 'clj', 'cljc', 'cljx', 'edn'],
+    },
+    coffeescript: {
+        exts: ['coffee'],
+    },
+    comments: {
+        exts: []
+    },
+    cpp: {
+        exts: ['cpp', 'c++', 'cc', 'cxx'],
+    },
+    'cpp-header': {
+        exts: ['hpp', 'h++', 'hh', 'hxx'],
+        parent: 'cpp',
+    },
+    crystal: {
+        exts: ['cr'],
+    },
+    csharp: {
+        exts: ['cs'],
+    },
+    csp: {
+        exts: [],
+    },
+    'css-extras': {
+        exts: [],
+    },
+    css: {
+        exts: ['css', 'gss'],
+    },
+    d: {
+        exts: ['d'],
+    },
+    dart: {
+        exts: ['dart'],
+    },
+    diff: {
+        exts: ['diff', 'patch'],
+    },
+    django: {
+        exts: [],
+    },
+    docker: {
+        exts: [],
+    },
+    eiffel: {
+        exts: ['e'],
+    },
+    elixir: {
+        exts: [],
+    },
+    elm: {
+        exts: ['elm'],
+    },
+    erb: {
+        exts: [],
+    },
+    erlang: {
+        exts: ['erl', 'erlang'],
+    },
+    flow: {
+        exts: [],
+    },
+    fortran: {
+        exts: ['f', 'for', 'f77', 'f90'],
+    },
+    fsharp: {
+        exts: ['fs'],
+    },
+    gedcom: {
+        exts: [],
+    },
+    gherkin: {
+        exts: ['feature'],
+    },
+    git: {
+        exts: [],
+    },
+    glsl: {
+        exts: [],
+    },
+    go: {
+        exts: ['go'],
+    },
+    graphql: {
+        exts: ['graphql'],
+    },
+    groovy: {
+        exts: ['groovy', 'gradle'],
+    },
+    haml: {
+        exts: ['haml'],
+    },
+    handlebars: {
+        exts: ['hb', 'hbs', 'handlebars'],
+    },
+    haskell: {
+        exts: ['hs', 'lhs '],
+    },
+    haxe: {
+        exts: ['hx', 'hxml'],
+    },
+    hpkp: {
+        exts: [],
+    },
+    hsts: {
+        exts: [],
+    },
+    http: {
+        exts: [],
+    },
+    ichigojam: {
+        exts: [],
+    },
+    icon: {
+        exts: [],
+    },
+    inform7: {
+        exts: [],
+    },
+    ini: {
+        exts: ['ini'],
+    },
+    io: {
+        exts: [],
+    },
+    j: {
+        exts: [],
+    },
+    java: {
+        exts: ['java'],
+    },
+    javascript: {
+        exts: ['js', 'es', 'es6'],
+    },
+    jolie: {
+        exts: [],
+    },
+    json: {
+        exts: ['json', 'map', 'jsonld'],
+    },
+    jsx: {
+        exts: ['jsx'],
+    },
+    julia: {
+        exts: ['jl'],
+    },
+    keymap: {
+        exts: [],
+    },
+    kotlin: {
+        exts: ['kt', 'kts'],
+    },
+    latex: {
+        exts: ['tex'],
+    },
+    less: {
+        exts: ['less'],
+    },
+    liquid: {
+        exts: [],
+    },
+    lisp: {
+        exts: ['cl', 'lisp', 'el'],
+    },
+    livescript: {
+        exts: ['ls'],
+    },
+    lolcode: {
+        exts: [],
+    },
+    lua: {
+        exts: ['lua'],
+    },
+    makefile: {
+        exts: [],
+    },
+    markdown: {
+        exts: ['md', 'markdown', 'mkd', 'txt'],
+    },
+    markup: {
+        exts: ['html', 'htm', 'xml', 'xsl', 'xslt', 'svg', 'vue', 'ejs', 'jsp'],
+    },
+    matlab: {
+        exts: [],
+    },
+    mel: {
+        exts: [],
+    },
+    mizar: {
+        exts: [],
+    },
+    monkey: {
+        exts: [],
+    },
+    n4js: {
+        exts: [],
+    },
+    nasm: {
+        exts: [],
+    },
+    nginx: {
+        exts: [],
+    },
+    nim: {
+        exts: [],
+    },
+    nix: {
+        exts: [],
+    },
+    nsis: {
+        exts: ['nsh', 'nsi'],
+    },
+    objectivec: {
+        exts: ['m', 'mm'],
+    },
+    ocaml: {
+        exts: ['ocaml', 'ml', 'mli', 'mll', 'mly'],
+    },
+    opencl: {
+        exts: [],
+    },
+    oz: {
+        exts: ['oz'],
+    },
+    parigp: {
+        exts: [],
+    },
+    pascal: {
+        exts: ['pas', 'p'],
+    },
+    perl: {
+        exts: ['pl', 'pm'],
+    },
+    php: {
+        exts: ['php', 'phtml'],
+    },
+    plsql: {
+        exts: ['plsql'],
+    },
+    powershell: {
+        exts: ['ps1', 'psd1', 'psm1'],
+    },
+    processing: {
+        exts: [],
+    },
+    prolog: {
+        exts: ['pro'],
+    },
+    properties: {
+        exts: ['properties'],
+    },
+    protobuf: {
+        exts: ['proto'],
+    },
+    pug: {
+        exts: ['pug', 'jade'],
+    },
+    puppet: {
+        exts: ['pp', 'puppet'],
+    },
+    pure: {
+        exts: [],
+    },
+    python: {
+        exts: ['py', 'pyx', 'pxd', 'pxi'],
+    },
+    q: {
+        exts: ['q'],
+    },
+    qore: {
+        exts: [],
+    },
+    r: {
+        exts: ['r', 'R'],
+    },
+    reason: {
+        exts: [],
+    },
+    renpy: {
+        exts: [],
+    },
+    rest: {
+        exts: [],
+    },
+    rip: {
+        exts: [],
+    },
+    roboconf: {
+        exts: [],
+    },
+    ruby: {
+        exts: ['rb'],
+    },
+    rust: {
+        exts: ['rs'],
+    },
+    sas: {
+        exts: ['sas'],
+    },
+    sass: {
+        exts: ['sass'],
+    },
+    scala: {
+        exts: ['scala'],
+    },
+    scheme: {
+        exts: ['scm', 'ss'],
+    },
+    scss: {
+        exts: ['scss'],
+    },
+    smalltalk: {
+        exts: ['st'],
+    },
+    smarty: {
+        exts: ['smarty', 'tpl'],
+    },
+    soy: {
+        exts: ['soy'],
+    },
+    sql: {
+        exts: ['sql', 'cql'],
+    },
+    stylus: {
+        exts: ['styl', 'stylus'],
+    },
+    swift: {
+        exts: ['swift'],
+    },
+    tap: {
+        exts: ['tap'],
+    },
+    tcl: {
+        exts: ['tcl'],
+    },
+    textile: {
+        exts: ['textile'],
+    },
+    tsx: {
+        exts: ['tsx'],
+    },
+    tt2: {
+        exts: ['tt2'],
+    },
+    twig: {
+        exts: ['twig'],
+    },
+    typescript: {
+        exts: ['ts'],
+    },
+    vbnet: {
+        exts: ['vb'],
+    },
+    velocity: {
+        exts: ['vtl'],
+    },
+    verilog: {
+        exts: ['v'],
+    },
+    vhdl: {
+        exts: ['vhd', 'vhdl'],
+    },
+    vim: {
+        exts: [],
+    },
+    'visual-basic': {
+        exts: ['vb'],
+    },
+    wasm: {
+        exts: [],
+    },
+    url: {
+        exts: [],
+    },
+    wiki: {
+        exts: [],
+    },
+    xeora: {
+        exts: [],
+    },
+    xojo: {
+        exts: [],
+    },
+    xquery: {
+        exts: ['xy', 'xquery'],
+    },
+    yaml: {
+        exts: ['yaml', 'yml'],
+    },
+};
+function getSupportedFormats() {
+    return Object.keys(exports.FORMATS).filter((name) => name !== 'important' && name !== 'url');
+}
+exports.getSupportedFormats = getSupportedFormats;
+function getFormatByFile(path, formatsExts) {
+    const ext = path_1.extname(path).slice(1);
+    if (formatsExts && Object.keys(formatsExts).length) {
+        return Object.keys(formatsExts).find((format) => formatsExts[format].includes(ext));
+    }
+    return Object.keys(exports.FORMATS).find((language) => exports.FORMATS[language].exts.includes(ext));
+}
+exports.getFormatByFile = getFormatByFile;
+//# sourceMappingURL=formats.js.map
+
+/***/ }),
+
+/***/ 53524:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const reprism = __nccwpck_require__(18042);
+const abap = __nccwpck_require__(65444);
+const actionscript = __nccwpck_require__(21019);
+const ada = __nccwpck_require__(99040);
+const apacheconf = __nccwpck_require__(70629);
+const apl = __nccwpck_require__(13529);
+const applescript = __nccwpck_require__(95394);
+const arff = __nccwpck_require__(56245);
+const asciidoc = __nccwpck_require__(86002);
+const asm6502 = __nccwpck_require__(68737);
+const aspnet = __nccwpck_require__(16326);
+const autohotkey = __nccwpck_require__(3183);
+const autoit = __nccwpck_require__(41502);
+const bash = __nccwpck_require__(15209);
+const basic = __nccwpck_require__(46676);
+const batch = __nccwpck_require__(20986);
+const brainfuck = __nccwpck_require__(64636);
+const bro = __nccwpck_require__(57206);
+const c = __nccwpck_require__(98220);
+const clike = __nccwpck_require__(17403);
+const clojure = __nccwpck_require__(45685);
+const coffeescript = __nccwpck_require__(20525);
+const cpp = __nccwpck_require__(26433);
+const csharp = __nccwpck_require__(3204);
+const csp = __nccwpck_require__(12115);
+const cssExtras = __nccwpck_require__(16590);
+const css = __nccwpck_require__(58302);
+const d = __nccwpck_require__(60310);
+const dart = __nccwpck_require__(14572);
+const diff = __nccwpck_require__(35844);
+const django = __nccwpck_require__(97535);
+const docker = __nccwpck_require__(94508);
+const eiffel = __nccwpck_require__(79209);
+const elixir = __nccwpck_require__(74952);
+const erlang = __nccwpck_require__(15691);
+const flow = __nccwpck_require__(53794);
+const fortran = __nccwpck_require__(90374);
+const fsharp = __nccwpck_require__(63354);
+const gedcom = __nccwpck_require__(25605);
+const gherkin = __nccwpck_require__(14194);
+const git = __nccwpck_require__(96602);
+const glsl = __nccwpck_require__(96860);
+const go = __nccwpck_require__(96509);
+const graphql = __nccwpck_require__(6219);
+const groovy = __nccwpck_require__(90897);
+const haml = __nccwpck_require__(33412);
+const handlebars = __nccwpck_require__(62023);
+const haskell = __nccwpck_require__(2524);
+const haxe = __nccwpck_require__(7267);
+const hpkp = __nccwpck_require__(358);
+const hsts = __nccwpck_require__(42669);
+const http = __nccwpck_require__(7378);
+const ichigojam = __nccwpck_require__(79406);
+const icon = __nccwpck_require__(87849);
+const inform7 = __nccwpck_require__(63411);
+const ini = __nccwpck_require__(49597);
+const io = __nccwpck_require__(28985);
+const j = __nccwpck_require__(83738);
+const java = __nccwpck_require__(47998);
+const javascript = __nccwpck_require__(48430);
+const jolie = __nccwpck_require__(37234);
+const json = __nccwpck_require__(96317);
+const jsx = __nccwpck_require__(16054);
+const julia = __nccwpck_require__(18521);
+const keyman = __nccwpck_require__(1453);
+const kotlin = __nccwpck_require__(69707);
+const latex = __nccwpck_require__(78387);
+const less = __nccwpck_require__(25526);
+const liquid = __nccwpck_require__(110);
+const lisp = __nccwpck_require__(5716);
+const livescript = __nccwpck_require__(4273);
+const lolcode = __nccwpck_require__(78908);
+const lua = __nccwpck_require__(28482);
+const makefile = __nccwpck_require__(65822);
+const markdown = __nccwpck_require__(20518);
+const markupTemplating = __nccwpck_require__(8914);
+const markup = __nccwpck_require__(42152);
+const matlab = __nccwpck_require__(21372);
+const mel = __nccwpck_require__(19177);
+const mizar = __nccwpck_require__(37457);
+const monkey = __nccwpck_require__(26314);
+const n4js = __nccwpck_require__(41630);
+const nasm = __nccwpck_require__(57062);
+const nginx = __nccwpck_require__(44909);
+const nim = __nccwpck_require__(64441);
+const nix = __nccwpck_require__(51758);
+const nsis = __nccwpck_require__(47159);
+const objectivec = __nccwpck_require__(41466);
+const ocaml = __nccwpck_require__(20505);
+const opencl = __nccwpck_require__(24484);
+const oz = __nccwpck_require__(70834);
+const parigp = __nccwpck_require__(29775);
+const parser = __nccwpck_require__(28480);
+const pascal = __nccwpck_require__(98305);
+const perl = __nccwpck_require__(46306);
+const phpExtras = __nccwpck_require__(78800);
+const php = __nccwpck_require__(92619);
+const powershell = __nccwpck_require__(31896);
+const processing = __nccwpck_require__(63028);
+const prolog = __nccwpck_require__(11831);
+const properties = __nccwpck_require__(6971);
+const protobuf = __nccwpck_require__(9802);
+const pug = __nccwpck_require__(47602);
+const puppet = __nccwpck_require__(16015);
+const pure = __nccwpck_require__(96047);
+const python = __nccwpck_require__(42212);
+const q = __nccwpck_require__(70061);
+const qore = __nccwpck_require__(97631);
+const r = __nccwpck_require__(20420);
+const reason = __nccwpck_require__(39443);
+const renpy = __nccwpck_require__(48755);
+const rest = __nccwpck_require__(57652);
+const rip = __nccwpck_require__(11090);
+const roboconf = __nccwpck_require__(72149);
+const ruby = __nccwpck_require__(40415);
+const rust = __nccwpck_require__(93399);
+const sas = __nccwpck_require__(96939);
+const sass = __nccwpck_require__(37650);
+const scala = __nccwpck_require__(60988);
+const scheme = __nccwpck_require__(14150);
+const scss = __nccwpck_require__(56838);
+const smalltalk = __nccwpck_require__(81200);
+const smarty = __nccwpck_require__(94171);
+const soy = __nccwpck_require__(89135);
+const stylus = __nccwpck_require__(94920);
+const swift = __nccwpck_require__(58479);
+const tcl = __nccwpck_require__(59758);
+const textile = __nccwpck_require__(38347);
+const tsx = __nccwpck_require__(13220);
+const twig = __nccwpck_require__(99323);
+const typescript = __nccwpck_require__(148);
+const vbnet = __nccwpck_require__(15305);
+const velocity = __nccwpck_require__(16657);
+const verilog = __nccwpck_require__(26734);
+const vhdl = __nccwpck_require__(19450);
+const vim = __nccwpck_require__(38565);
+const visualBasic = __nccwpck_require__(58229);
+const wasm = __nccwpck_require__(63735);
+const wiki = __nccwpck_require__(9213);
+const xeora = __nccwpck_require__(93867);
+const xojo = __nccwpck_require__(81975);
+const yaml = __nccwpck_require__(54163);
+const tap = __nccwpck_require__(33636);
+const sql = __nccwpck_require__(19325);
+const plsql = __nccwpck_require__(23678);
+exports.languages = {
+    abap, actionscript, ada, apacheconf, apl, applescript, arff,
+    asciidoc, asm6502, aspnet, autohotkey, autoit, bash, basic, batch,
+    brainfuck, bro, c, clike, clojure, coffeescript, cpp, csharp, csp, cssExtras,
+    css, d, dart, diff, django, docker, eiffel, elixir, erlang, flow, fortran, fsharp,
+    gedcom, gherkin, git, glsl, go, graphql, groovy, haml, handlebars, haskell, haxe,
+    hpkp, hsts, http, ichigojam, icon, inform7, ini, io, j, java, javascript, jolie,
+    json, jsx, julia, keyman, kotlin, latex, less, liquid, lisp, livescript,
+    lolcode, lua, makefile, markdown, markupTemplating, markup, matlab, mel, mizar,
+    monkey, n4js, nasm, nginx, nim, nix, nsis, objectivec, ocaml, opencl, oz, parigp,
+    parser, pascal, perl, php, phpExtras, powershell, processing, prolog,
+    properties, protobuf, pug, puppet, pure, python, q, qore, r, reason, renpy, rest,
+    rip, roboconf, ruby, rust, sas, sass, scala, scheme, scss, smalltalk, smarty, soy,
+    stylus, swift, tcl, textile, twig, typescript, vbnet, velocity, verilog, vhdl,
+    vim, visualBasic, wasm, wiki, xeora, xojo, yaml, tsx, sql, plsql, tap
+};
+exports.loadLanguages = () => {
+    reprism.loadLanguages(Object.values(exports.languages).map(v => v.default));
+};
+//# sourceMappingURL=grammar-loader.js.map
+
+/***/ }),
+
+/***/ 43439:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const SparkMD5 = __nccwpck_require__(70220);
+function hash(value) {
+    return SparkMD5.hash(value);
+}
+exports.hash = hash;
+//# sourceMappingURL=hash.js.map
+
+/***/ }),
+
+/***/ 92080:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+function __export(m) {
+    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
+}
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const tokenize_1 = __nccwpck_require__(74749);
+__export(__nccwpck_require__(74749));
+__export(__nccwpck_require__(78199));
+__export(__nccwpck_require__(85049));
+class Tokenizer {
+    generateMaps(id, data, format, options) {
+        return tokenize_1.createTokenMapBasedOnCode(id, data, format, options);
+    }
+}
+exports.Tokenizer = Tokenizer;
+//# sourceMappingURL=index.js.map
+
+/***/ }),
+
+/***/ 23678:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const grammar = {
+    language: 'plsql',
+    init(Prism) {
+        Prism.languages.plsql = Prism.languages.extend('sql', {
+            comment: [/\/\*[\s\S]*?\*\//, /--.*/],
+        });
+        if (Prism.util.type(Prism.languages.plsql.keyword) !== 'Array') {
+            Prism.languages.plsql.keyword = [Prism.languages.plsql.keyword];
+        }
+        Prism.languages.plsql.keyword.unshift(/\b(?:ACCESS|AGENT|AGGREGATE|ARRAY|ARROW|AT|ATTRIBUTE|AUDIT|AUTHID|BFILE_BASE|BLOB_BASE|BLOCK|BODY|BOTH|BOUND|BYTE|CALLING|CHAR_BASE|CHARSET(?:FORM|ID)|CLOB_BASE|COLAUTH|COLLECT|CLUSTERS?|COMPILED|COMPRESS|CONSTANT|CONSTRUCTOR|CONTEXT|CRASH|CUSTOMDATUM|DANGLING|DATE_BASE|DEFINE|DETERMINISTIC|DURATION|ELEMENT|EMPTY|EXCEPTIONS?|EXCLUSIVE|EXTERNAL|FINAL|FORALL|FORM|FOUND|GENERAL|HEAP|HIDDEN|IDENTIFIED|IMMEDIATE|INCLUDING|INCREMENT|INDICATOR|INDEXES|INDICES|INFINITE|INITIAL|ISOPEN|INSTANTIABLE|INTERFACE|INVALIDATE|JAVA|LARGE|LEADING|LENGTH|LIBRARY|LIKE[24C]|LIMITED|LONG|LOOP|MAP|MAXEXTENTS|MAXLEN|MEMBER|MINUS|MLSLABEL|MULTISET|NAME|NAN|NATIVE|NEW|NOAUDIT|NOCOMPRESS|NOCOPY|NOTFOUND|NOWAIT|NUMBER(?:_BASE)?|OBJECT|OCI(?:COLL|DATE|DATETIME|DURATION|INTERVAL|LOBLOCATOR|NUMBER|RAW|REF|REFCURSOR|ROWID|STRING|TYPE)|OFFLINE|ONLINE|ONLY|OPAQUE|OPERATOR|ORACLE|ORADATA|ORGANIZATION|ORL(?:ANY|VARY)|OTHERS|OVERLAPS|OVERRIDING|PACKAGE|PARALLEL_ENABLE|PARAMETERS?|PASCAL|PCTFREE|PIPE(?:LINED)?|PRAGMA|PRIOR|PRIVATE|RAISE|RANGE|RAW|RECORD|REF|REFERENCE|REM|REMAINDER|RESULT|RESOURCE|RETURNING|REVERSE|ROW(?:ID|NUM|TYPE)|SAMPLE|SB[124]|SEGMENT|SELF|SEPARATE|SEQUENCE|SHORT|SIZE(?:_T)?|SPARSE|SQL(?:CODE|DATA|NAME|STATE)|STANDARD|STATIC|STDDEV|STORED|STRING|STRUCT|STYLE|SUBMULTISET|SUBPARTITION|SUBSTITUTABLE|SUBTYPE|SUCCESSFUL|SYNONYM|SYSDATE|TABAUTH|TDO|THE|TIMEZONE_(?:ABBR|HOUR|MINUTE|REGION)|TRAILING|TRANSAC(?:TIONAL)?|TRUSTED|UB[124]|UID|UNDER|UNTRUSTED|VALIDATE|VALIST|VARCHAR2|VARIABLE|VARIANCE|VARRAY|VIEWS|VOID|WHENEVER|WRAPPED|ZONE)\b/i);
+        if (Prism.util.type(Prism.languages.plsql.operator) !== 'Array') {
+            Prism.languages.plsql.operator = [Prism.languages.plsql.operator];
+        }
+        Prism.languages.plsql.operator.unshift(/:=/);
+    },
+};
+exports["default"] = grammar;
+//# sourceMappingURL=plsql.js.map
+
+/***/ }),
+
+/***/ 19325:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const grammar = {
+    language: 'sql',
+    init(Prism) {
+        Prism.languages.sql = {
+            'comment': {
+                pattern: /(^|[^\\])(?:\/\*[\s\S]*?\*\/|(?:--|\/\/|#).*)/,
+                lookbehind: true,
+            },
+            'variable': [
+                {
+                    pattern: /@(["'`])(?:\\[\s\S]|(?!\1)[^\\])+\1/,
+                    greedy: true,
+                },
+                /@[\w.$]+/,
+            ],
+            'string': {
+                pattern: /(^|[^@\\])("|')(?:\\[\s\S]|(?!\2)[^\\]|\2\2)*\2/,
+                greedy: true,
+                lookbehind: true,
+            },
+            'function': /\b(?:AVG|COUNT|FIRST|FORMAT|LAST|LCASE|LEN|MAX|MID|MIN|MOD|NOW|ROUND|SUM|UCASE)(?=\s*\()/i,
+            'keyword': /\b(?:ACTION|ADD|AFTER|ALGORITHM|ALL|ALTER|ANALYZE|ANY|APPLY|AS|ASC|AUTHORIZATION|AUTO_INCREMENT|BACKUP|BDB|BEGIN|BERKELEYDB|BIGINT|BINARY|BIT|BLOB|BOOL|BOOLEAN|BREAK|BROWSE|BTREE|BULK|BY|CALL|CASCADED?|CASE|CHAIN|CHAR(?:ACTER|SET)?|CHECK(?:POINT)?|CLOSE|CLUSTERED|COALESCE|COLLATE|COLUMNS?|COMMENT|COMMIT(?:TED)?|COMPUTE|CONNECT|CONSISTENT|CONSTRAINT|CONTAINS(?:TABLE)?|CONTINUE|CONVERT|CREATE|CROSS|CURRENT(?:_DATE|_TIME|_TIMESTAMP|_USER)?|CURSOR|CYCLE|DATA(?:BASES?)?|DATE(?:TIME)?|DAY|DBCC|DEALLOCATE|DEC|DECIMAL|DECLARE|DEFAULT|DEFINER|DELAYED|DELETE|DELIMITERS?|DENY|DESC|DESCRIBE|DETERMINISTIC|DISABLE|DISCARD|DISK|DISTINCT|DISTINCTROW|DISTRIBUTED|DO|DOUBLE|DROP|DUMMY|DUMP(?:FILE)?|DUPLICATE|ELSE(?:IF)?|ENABLE|ENCLOSED|END|ENGINE|ENUM|ERRLVL|ERRORS|ESCAPED?|EXCEPT|EXEC(?:UTE)?|EXISTS|EXIT|EXPLAIN|EXTENDED|FETCH|FIELDS|FILE|FILLFACTOR|FIRST|FIXED|FLOAT|FOLLOWING|FOR(?: EACH ROW)?|FORCE|FOREIGN|FREETEXT(?:TABLE)?|FROM|FULL|FUNCTION|GEOMETRY(?:COLLECTION)?|GLOBAL|GOTO|GRANT|GROUP|HANDLER|HASH|HAVING|HOLDLOCK|HOUR|IDENTITY(?:_INSERT|COL)?|IF|IGNORE|IMPORT|INDEX|INFILE|INNER|INNODB|INOUT|INSERT|INT|INTEGER|INTERSECT|INTERVAL|INTO|INVOKER|ISOLATION|ITERATE|JOIN|KEYS?|KILL|LANGUAGE|LAST|LEAVE|LEFT|LEVEL|LIMIT|LINENO|LINES|LINESTRING|LOAD|LOCAL|LOCK|LONG(?:BLOB|TEXT)|LOOP|MATCH(?:ED)?|MEDIUM(?:BLOB|INT|TEXT)|MERGE|MIDDLEINT|MINUTE|MODE|MODIFIES|MODIFY|MONTH|MULTI(?:LINESTRING|POINT|POLYGON)|NATIONAL|NATURAL|NCHAR|NEXT|NO|NONCLUSTERED|NULLIF|NUMERIC|OFF?|OFFSETS?|ON|OPEN(?:DATASOURCE|QUERY|ROWSET)?|OPTIMIZE|OPTION(?:ALLY)?|ORDER|OUT(?:ER|FILE)?|OVER|PARTIAL|PARTITION|PERCENT|PIVOT|PLAN|POINT|POLYGON|PRECEDING|PRECISION|PREPARE|PREV|PRIMARY|PRINT|PRIVILEGES|PROC(?:EDURE)?|PUBLIC|PURGE|QUICK|RAISERROR|READS?|REAL|RECONFIGURE|REFERENCES|RELEASE|RENAME|REPEAT(?:ABLE)?|REPLACE|REPLICATION|REQUIRE|RESIGNAL|RESTORE|RESTRICT|RETURNS?|REVOKE|RIGHT|ROLLBACK|ROUTINE|ROW(?:COUNT|GUIDCOL|S)?|RTREE|RULE|SAVE(?:POINT)?|SCHEMA|SECOND|SELECT|SERIAL(?:IZABLE)?|SESSION(?:_USER)?|SET(?:USER)?|SHARE|SHOW|SHUTDOWN|SIMPLE|SMALLINT|SNAPSHOT|SOME|SONAME|SQL|START(?:ING)?|STATISTICS|STATUS|STRIPED|SYSTEM_USER|TABLES?|TABLESPACE|TEMP(?:ORARY|TABLE)?|TERMINATED|TEXT(?:SIZE)?|THEN|TIME(?:STAMP)?|TINY(?:BLOB|INT|TEXT)|TOP?|TRAN(?:SACTIONS?)?|TRIGGER|TRUNCATE|TSEQUAL|TYPES?|UNBOUNDED|UNCOMMITTED|UNDEFINED|UNION|UNIQUE|UNLOCK|UNPIVOT|UNSIGNED|UPDATE(?:TEXT)?|USAGE|USE|USER|USING|VALUES?|VAR(?:BINARY|CHAR|CHARACTER|YING)|VIEW|WAITFOR|WARNINGS|WHEN|WHERE|WHILE|WITH(?: ROLLUP|IN)?|WORK|WRITE(?:TEXT)?|YEAR)\b/i,
+            'boolean': /\b(?:TRUE|FALSE|NULL)\b/i,
+            'number': /\b0x[\da-f]+\b|\b\d+\.?\d*|\B\.\d+\b/i,
+            'operator': /[-+*\/=%^~]|&&?|\|\|?|!=?|<(?:=>?|<|>)?|>[>=]?|\b(?:AND|BETWEEN|IN|LIKE|NOT|OR|IS|DIV|REGEXP|RLIKE|SOUNDS LIKE|XOR)\b/i,
+            'punctuation': /[;[\]()`,.]/,
+        };
+    },
+};
+exports["default"] = grammar;
+//# sourceMappingURL=sql.js.map
+
+/***/ }),
+
+/***/ 33636:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const grammar = {
+    language: 'tap',
+    init(Prism) {
+        Prism.languages.tap = {
+            fail: /not ok[^#{\n\r]*/,
+            pass: /ok[^#{\n\r]*/,
+            pragma: /pragma [+-][a-z]+/,
+            bailout: /bail out!.*/i,
+            version: /TAP version \d+/i,
+            plan: /\d+\.\.\d+(?: +#.*)?/,
+            subtest: {
+                pattern: /# Subtest(?:: .*)?/,
+                greedy: true
+            },
+            punctuation: /[{}]/,
+            directive: /#.*/,
+            yamlish: {
+                pattern: /(^[ \t]*)---[\s\S]*?[\r\n][ \t]*\.\.\.$/m,
+                lookbehind: true,
+                inside: Prism.languages.yaml,
+                alias: 'language-yaml'
+            }
+        };
+    },
+};
+exports["default"] = grammar;
+//# sourceMappingURL=tap.js.map
+
+/***/ }),
+
+/***/ 78199:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const hash_1 = __nccwpck_require__(43439);
+const TOKEN_HASH_LENGTH = 20;
+function createTokenHash(token, hashFunction = undefined) {
+    return hashFunction ?
+        hashFunction(token.type + token.value).substr(0, TOKEN_HASH_LENGTH) :
+        hash_1.hash(token.type + token.value).substr(0, TOKEN_HASH_LENGTH);
+}
+function groupByFormat(tokens) {
+    const result = {};
+    // TODO change to reduce
+    tokens.forEach((token) => {
+        (result[token.format] = result[token.format] ? [...result[token.format], token] : [token]);
+    });
+    return result;
+}
+class TokensMap {
+    constructor(id, data, tokens, format, options) {
+        this.id = id;
+        this.data = data;
+        this.tokens = tokens;
+        this.format = format;
+        this.options = options;
+        this.position = 0;
+        this.hashMap = this.tokens.map((token) => {
+            if (options.ignoreCase) {
+                token.value = token.value.toLocaleLowerCase();
+            }
+            return createTokenHash(token, this.options.hashFunction);
+        }).join('');
+    }
+    getTokensCount() {
+        return this.tokens[this.tokens.length - 1].loc.end.position - this.tokens[0].loc.start.position;
+    }
+    getId() {
+        return this.id;
+    }
+    getLinesCount() {
+        return this.tokens[this.tokens.length - 1].loc.end.line - this.tokens[0].loc.start.line;
+    }
+    getFormat() {
+        return this.format;
+    }
+    [Symbol.iterator]() {
+        return this;
+    }
+    next() {
+        const hashFunction = this.options.hashFunction ? this.options.hashFunction : hash_1.hash;
+        const mapFrame = hashFunction(this.hashMap.substring(this.position * TOKEN_HASH_LENGTH, this.position * TOKEN_HASH_LENGTH + this.options.minTokens * TOKEN_HASH_LENGTH)).substring(0, TOKEN_HASH_LENGTH);
+        if (this.position < this.tokens.length - this.options.minTokens) {
+            this.position++;
+            return {
+                done: false,
+                value: {
+                    id: mapFrame,
+                    sourceId: this.getId(),
+                    start: this.tokens[this.position - 1],
+                    end: this.tokens[this.position + this.options.minTokens - 1],
+                },
+            };
+        }
+        else {
+            return {
+                done: true,
+                value: false,
+            };
+        }
+    }
+}
+exports.TokensMap = TokensMap;
+function generateMapsForFormats(id, data, tokens, options) {
+    return Object
+        .values(groupByFormat(tokens))
+        .map((formatTokens) => new TokensMap(id, data, formatTokens, formatTokens[0].format, options));
+}
+exports.generateMapsForFormats = generateMapsForFormats;
+function createTokensMaps(id, data, tokens, options) {
+    return generateMapsForFormats(id, data, tokens, options);
+}
+exports.createTokensMaps = createTokensMaps;
+//# sourceMappingURL=token-map.js.map
+
+/***/ }),
+
+/***/ 74749:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const reprism = __nccwpck_require__(18042);
+const formats_1 = __nccwpck_require__(85049);
+const token_map_1 = __nccwpck_require__(78199);
+const grammar_loader_1 = __nccwpck_require__(53524);
+const ignore = {
+    ignore: [
+        {
+            pattern: /(jscpd:ignore-start)[\s\S]*?(?=jscpd:ignore-end)/,
+            lookbehind: true,
+            greedy: true,
+        },
+        {
+            pattern: /jscpd:ignore-start/,
+            greedy: false,
+        },
+        {
+            pattern: /jscpd:ignore-end/,
+            greedy: false,
+        },
+    ],
+};
+const punctuation = {
+    // eslint-disable-next-line @typescript-eslint/camelcase
+    new_line: /\n/,
+    empty: /\s+/,
+};
+const initializeFormats = () => {
+    grammar_loader_1.loadLanguages();
+    Object
+        .keys(reprism.default.languages)
+        .forEach((lang) => {
+        if (lang !== 'extend' && lang !== 'insertBefore' && lang !== 'DFS') {
+            reprism.default.languages[lang] = Object.assign(Object.assign(Object.assign({}, ignore), reprism.default.languages[lang]), punctuation);
+        }
+    });
+};
+initializeFormats();
+function getLanguagePrismName(lang) {
+    if (lang in formats_1.FORMATS && formats_1.FORMATS[lang].parent) {
+        return formats_1.FORMATS[lang].parent;
+    }
+    return lang;
+}
+function tokenize(code, language) {
+    let length = 0;
+    let line = 1;
+    let column = 1;
+    function sanitizeLangName(name) {
+        return name && name.replace ? name.replace('language-', '') : 'unknown';
+    }
+    function createTokenFromString(token, lang) {
+        return [
+            {
+                format: lang,
+                type: 'default',
+                value: token,
+                length: token.length,
+            },
+        ];
+    }
+    function calculateLocation(token, position) {
+        const result = token;
+        const lines = typeof result.value === 'string' && result.value.split ? result.value.split('\n') : [];
+        const newLines = lines.length - 1;
+        const start = {
+            line,
+            column,
+            position
+        };
+        column = newLines >= 0 ? lines[lines.length - 1].length + 1 : column;
+        const end = {
+            line: line + newLines,
+            column,
+            position
+        };
+        result.loc = { start, end };
+        result.range = [length, length + result.length];
+        length += result.length;
+        line += newLines;
+        return result;
+    }
+    function createTokenFromFlatToken(token, lang) {
+        return [
+            {
+                format: lang,
+                type: token.type,
+                value: token.content,
+                length: token.length,
+            },
+        ];
+    }
+    function createTokens(token, lang) {
+        if (token.content && typeof token.content === 'string') {
+            return createTokenFromFlatToken(token, lang);
+        }
+        if (token.content && Array.isArray(token.content)) {
+            let res = [];
+            token.content.forEach((t) => (res = res.concat(createTokens(t, token.alias ? sanitizeLangName(token.alias) : lang))));
+            return res;
+        }
+        return createTokenFromString(token, lang);
+    }
+    let tokens = [];
+    const grammar = reprism.default.languages[getLanguagePrismName(language)];
+    if (!reprism.default.languages[getLanguagePrismName(language)]) {
+        console.warn('Warn: jscpd has issue with support of "' + getLanguagePrismName(language) + '"');
+        return [];
+    }
+    reprism.default.tokenize(code, grammar)
+        .forEach((t) => (tokens = tokens.concat(createTokens(t, language))));
+    return tokens
+        .filter((t) => t.format in formats_1.FORMATS)
+        .map((token, index) => calculateLocation(token, index));
+}
+exports.tokenize = tokenize;
+function setupIgnorePatterns(format, ignorePattern) {
+    const language = getLanguagePrismName(format);
+    const ignorePatterns = ignorePattern.map(pattern => ({
+        pattern: new RegExp(pattern),
+        greedy: false,
+    }));
+    reprism.default.languages[language] = Object.assign(Object.assign({}, ignorePatterns), reprism.default.languages[language]);
+}
+function createTokenMapBasedOnCode(id, data, format, options = {}) {
+    const { mode, ignoreCase, ignorePattern } = options;
+    const tokens = tokenize(data, format)
+        .filter((token) => mode(token, options));
+    if (ignorePattern)
+        setupIgnorePatterns(format, options.ignorePattern);
+    if (ignoreCase) {
+        return token_map_1.createTokensMaps(id, data, tokens.map((token) => {
+            token.value = token.value.toLocaleLowerCase();
+            return token;
+        }), options);
+    }
+    return token_map_1.createTokensMaps(id, data, tokens, options);
+}
+exports.createTokenMapBasedOnCode = createTokenMapBasedOnCode;
+//# sourceMappingURL=tokenize.js.map
+
+/***/ }),
+
 /***/ 63803:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
@@ -7462,9 +9864,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.detectClones = void 0;
-const core_1 = __nccwpck_require__(82576);
-const finder_1 = __nccwpck_require__(70982);
-const tokenizer_1 = __nccwpck_require__(1551);
+const core_1 = __nccwpck_require__(84511);
+const finder_1 = __nccwpck_require__(39148);
+const tokenizer_1 = __nccwpck_require__(92080);
 const detectClones = (path, options = {}) => __awaiter(void 0, void 0, void 0, function* () {
     const defaultOptions = Object.assign(Object.assign({}, (0, core_1.getDefaultOptions)()), {
         format: (0, tokenizer_1.getSupportedFormats)()
@@ -7568,2408 +9970,6 @@ const getProjectMetric = (variables) => __awaiter(void 0, void 0, void 0, functi
 });
 exports.getProjectMetric = getProjectMetric;
 //# sourceMappingURL=endpoints.js.map
-
-/***/ }),
-
-/***/ 71896:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const rabin_karp_1 = __nccwpck_require__(70569);
-const validators_1 = __nccwpck_require__(65799);
-const mode_1 = __nccwpck_require__(72010);
-// TODO replace to own event emitter
-const EventEmitter = __nccwpck_require__(11848);
-class Detector extends EventEmitter {
-    constructor(tokenizer, store, cloneValidators = [], options) {
-        super();
-        this.tokenizer = tokenizer;
-        this.store = store;
-        this.cloneValidators = cloneValidators;
-        this.options = options;
-        this.initCloneValidators();
-        this.algorithm = new rabin_karp_1.RabinKarp(this.options, this, this.cloneValidators);
-        this.options.minTokens = this.options.minTokens || 50;
-        this.options.maxLines = this.options.maxLines || 500;
-        this.options.minLines = this.options.minLines || 5;
-        this.options.mode = this.options.mode || mode_1.mild;
-    }
-    detect(id, text, format) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const tokenMaps = this.tokenizer.generateMaps(id, text, format, this.options);
-            // TODO change stores implementation
-            this.store.namespace(format);
-            const detect = (tokenMap, clones) => __awaiter(this, void 0, void 0, function* () {
-                if (tokenMap) {
-                    this.emit('START_DETECTION', { source: tokenMap });
-                    return this.algorithm
-                        .run(tokenMap, this.store)
-                        .then((clns) => {
-                        clones.push(...clns);
-                        const nextTokenMap = tokenMaps.pop();
-                        if (nextTokenMap) {
-                            return detect(nextTokenMap, clones);
-                        }
-                        else {
-                            return clones;
-                        }
-                    });
-                }
-            });
-            return detect(tokenMaps.pop(), []);
-        });
-    }
-    initCloneValidators() {
-        if (this.options.minLines || this.options.maxLines) {
-            this.cloneValidators.push(new validators_1.LinesLengthCloneValidator());
-        }
-    }
-}
-exports.Detector = Detector;
-//# sourceMappingURL=detector.js.map
-
-/***/ }),
-
-/***/ 82576:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-function __export(m) {
-    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
-}
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-__export(__nccwpck_require__(71896));
-__export(__nccwpck_require__(72010));
-__export(__nccwpck_require__(94994));
-__export(__nccwpck_require__(84222));
-__export(__nccwpck_require__(77691));
-//# sourceMappingURL=index.js.map
-
-/***/ }),
-
-/***/ 72010:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-function strict(token) {
-    return token.type !== 'ignore';
-}
-exports.strict = strict;
-function mild(token) {
-    return strict(token) && token.type !== 'empty' && token.type !== 'new_line';
-}
-exports.mild = mild;
-function weak(token) {
-    return mild(token)
-        && token.format !== 'comment'
-        && token.type !== 'comment'
-        && token.type !== 'block-comment';
-}
-exports.weak = weak;
-const MODES = {
-    mild,
-    strict,
-    weak,
-};
-function getModeByName(name) {
-    if (name in MODES) {
-        return MODES[name];
-    }
-    throw new Error(`Mode ${name} does not supported yet.`);
-}
-exports.getModeByName = getModeByName;
-function getModeHandler(mode) {
-    return typeof mode === 'string' ? getModeByName(mode) : mode;
-}
-exports.getModeHandler = getModeHandler;
-//# sourceMappingURL=mode.js.map
-
-/***/ }),
-
-/***/ 94994:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const mode_1 = __nccwpck_require__(72010);
-function getDefaultOptions() {
-    return {
-        executionId: new Date().toISOString(),
-        path: [process.cwd()],
-        mode: mode_1.getModeHandler('mild'),
-        minLines: 5,
-        maxLines: 1000,
-        maxSize: '100kb',
-        minTokens: 50,
-        output: './report',
-        reporters: ['console'],
-        ignore: [],
-        threshold: undefined,
-        formatsExts: {},
-        debug: false,
-        silent: false,
-        blame: false,
-        cache: true,
-        absolute: false,
-        noSymlinks: false,
-        skipLocal: false,
-        ignoreCase: false,
-        gitignore: false,
-        reportersOptions: {},
-        exitCode: 0,
-    };
-}
-exports.getDefaultOptions = getDefaultOptions;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getOption(name, options) {
-    const defaultOptions = getDefaultOptions();
-    return options ? options[name] || defaultOptions[name] : defaultOptions[name];
-}
-exports.getOption = getOption;
-//# sourceMappingURL=options.js.map
-
-/***/ }),
-
-/***/ 70569:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const validators_1 = __nccwpck_require__(65799);
-class RabinKarp {
-    constructor(options, eventEmitter, cloneValidators) {
-        this.options = options;
-        this.eventEmitter = eventEmitter;
-        this.cloneValidators = cloneValidators;
-    }
-    run(tokenMap, store) {
-        return __awaiter(this, void 0, void 0, function* () {
-            return new Promise((resolve => {
-                let mapFrameInStore;
-                let clone = null;
-                const clones = [];
-                // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
-                const loop = () => {
-                    const iteration = tokenMap.next();
-                    store
-                        .get(iteration.value.id)
-                        .then((mapFrameFromStore) => {
-                        mapFrameInStore = mapFrameFromStore;
-                        if (!clone) {
-                            clone = RabinKarp.createClone(tokenMap.getFormat(), iteration.value, mapFrameInStore);
-                        }
-                    }, () => {
-                        if (clone && this.validate(clone)) {
-                            clones.push(clone);
-                        }
-                        clone = null;
-                        if (iteration.value.id) {
-                            return store.set(iteration.value.id, iteration.value);
-                        }
-                    })
-                        .finally(() => {
-                        if (!iteration.done) {
-                            if (clone) {
-                                clone = RabinKarp.enlargeClone(clone, iteration.value, mapFrameInStore);
-                            }
-                            loop();
-                        }
-                        else {
-                            resolve(clones);
-                        }
-                    });
-                };
-                loop();
-            }));
-        });
-    }
-    validate(clone) {
-        const validation = validators_1.runCloneValidators(clone, this.options, this.cloneValidators);
-        if (validation.status) {
-            this.eventEmitter.emit('CLONE_FOUND', { clone });
-        }
-        else {
-            this.eventEmitter.emit('CLONE_SKIPPED', { clone, validation });
-        }
-        return validation.status;
-    }
-    static createClone(format, mapFrameA, mapFrameB) {
-        return {
-            format,
-            foundDate: new Date().getTime(),
-            duplicationA: {
-                sourceId: mapFrameA.sourceId,
-                start: mapFrameA.start.loc.start,
-                end: mapFrameA.end.loc.end,
-                range: [mapFrameA.start.range[0], mapFrameA.end.range[1]],
-            },
-            duplicationB: {
-                sourceId: mapFrameB.sourceId,
-                start: mapFrameB.start.loc.start,
-                end: mapFrameB.end.loc.end,
-                range: [mapFrameB.start.range[0], mapFrameB.end.range[1]],
-            },
-        };
-    }
-    static enlargeClone(clone, mapFrameA, mapFrameB) {
-        clone.duplicationA.range[1] = mapFrameA.end.range[1];
-        clone.duplicationA.end = mapFrameA.end.loc.end;
-        clone.duplicationB.range[1] = mapFrameB.end.range[1];
-        clone.duplicationB.end = mapFrameB.end.loc.end;
-        return clone;
-    }
-}
-exports.RabinKarp = RabinKarp;
-//# sourceMappingURL=rabin-karp.js.map
-
-/***/ }),
-
-/***/ 84222:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-class Statistic {
-    constructor(options) {
-        this.options = options;
-        this.statistic = {
-            detectionDate: new Date().toISOString(),
-            formats: {},
-            total: Statistic.getDefaultStatistic(),
-        };
-    }
-    static getDefaultStatistic() {
-        return {
-            lines: 0,
-            tokens: 0,
-            sources: 0,
-            clones: 0,
-            duplicatedLines: 0,
-            duplicatedTokens: 0,
-            percentage: 0,
-            percentageTokens: 0,
-            newDuplicatedLines: 0,
-            newClones: 0,
-        };
-    }
-    subscribe() {
-        return {
-            CLONE_FOUND: this.cloneFound.bind(this),
-            START_DETECTION: this.matchSource.bind(this),
-        };
-    }
-    getStatistic() {
-        return this.statistic;
-    }
-    cloneFound(payload) {
-        const { clone } = payload;
-        const id = clone.duplicationA.sourceId;
-        const id2 = clone.duplicationB.sourceId;
-        const linesCount = clone.duplicationA.end.line - clone.duplicationA.start.line;
-        const duplicatedTokens = clone.duplicationA.end.position - clone.duplicationA.start.position;
-        this.statistic.total.clones++;
-        this.statistic.total.duplicatedLines += linesCount;
-        this.statistic.total.duplicatedTokens += duplicatedTokens;
-        this.statistic.formats[clone.format].total.clones++;
-        this.statistic.formats[clone.format].total.duplicatedLines += linesCount;
-        this.statistic.formats[clone.format].total.duplicatedTokens += duplicatedTokens;
-        this.statistic.formats[clone.format].sources[id].clones++;
-        this.statistic.formats[clone.format].sources[id].duplicatedLines += linesCount;
-        this.statistic.formats[clone.format].sources[id].duplicatedTokens += duplicatedTokens;
-        this.statistic.formats[clone.format].sources[id2].clones++;
-        this.statistic.formats[clone.format].sources[id2].duplicatedLines += linesCount;
-        this.statistic.formats[clone.format].sources[id2].duplicatedTokens += duplicatedTokens;
-        this.updatePercentage(clone.format);
-    }
-    matchSource(payload) {
-        const { source } = payload;
-        const format = source.getFormat();
-        if (!(format in this.statistic.formats)) {
-            this.statistic.formats[format] = {
-                sources: {},
-                total: Statistic.getDefaultStatistic(),
-            };
-        }
-        this.statistic.total.sources++;
-        this.statistic.total.lines += source.getLinesCount();
-        this.statistic.total.tokens += source.getTokensCount();
-        this.statistic.formats[format].total.sources++;
-        this.statistic.formats[format].total.lines += source.getLinesCount();
-        this.statistic.formats[format].total.tokens += source.getTokensCount();
-        this.statistic.formats[format].sources[source.getId()] =
-            this.statistic.formats[format].sources[source.getId()] || Statistic.getDefaultStatistic();
-        this.statistic.formats[format].sources[source.getId()].sources = 1;
-        this.statistic.formats[format].sources[source.getId()].lines += source.getLinesCount();
-        this.statistic.formats[format].sources[source.getId()].tokens += source.getTokensCount();
-        this.updatePercentage(format);
-    }
-    updatePercentage(format) {
-        this.statistic.total.percentage = Statistic.calculatePercentage(this.statistic.total.lines, this.statistic.total.duplicatedLines);
-        this.statistic.total.percentageTokens = Statistic.calculatePercentage(this.statistic.total.tokens, this.statistic.total.duplicatedTokens);
-        this.statistic.formats[format].total.percentage = Statistic.calculatePercentage(this.statistic.formats[format].total.lines, this.statistic.formats[format].total.duplicatedLines);
-        this.statistic.formats[format].total.percentageTokens = Statistic.calculatePercentage(this.statistic.formats[format].total.tokens, this.statistic.formats[format].total.duplicatedTokens);
-        Object.entries(this.statistic.formats[format].sources).forEach(([id, stat]) => {
-            this.statistic.formats[format].sources[id].percentage = Statistic.calculatePercentage(stat.lines, stat.duplicatedLines);
-            this.statistic.formats[format].sources[id].percentageTokens = Statistic.calculatePercentage(stat.tokens, stat.duplicatedTokens);
-        });
-    }
-    static calculatePercentage(total, cloned) {
-        return total ? Math.round((10000 * cloned) / total) / 100 : 0.0;
-    }
-}
-exports.Statistic = Statistic;
-//# sourceMappingURL=statistic.js.map
-
-/***/ }),
-
-/***/ 77691:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-class MemoryStore {
-    constructor() {
-        this.values = {};
-    }
-    namespace(namespace) {
-        this._namespace = namespace;
-        this.values[namespace] = this.values[namespace] || {};
-    }
-    get(key) {
-        return new Promise((resolve, reject) => {
-            if (key in this.values[this._namespace]) {
-                resolve(this.values[this._namespace][key]);
-            }
-            else {
-                reject(new Error('not found'));
-            }
-        });
-    }
-    set(key, value) {
-        this.values[this._namespace][key] = value;
-        return Promise.resolve(value);
-    }
-    close() {
-        this.values = {};
-    }
-}
-exports.MemoryStore = MemoryStore;
-//# sourceMappingURL=memory.js.map
-
-/***/ }),
-
-/***/ 65799:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-function __export(m) {
-    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
-}
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-__export(__nccwpck_require__(97942));
-__export(__nccwpck_require__(98147));
-//# sourceMappingURL=index.js.map
-
-/***/ }),
-
-/***/ 97942:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-class LinesLengthCloneValidator {
-    validate(clone, options) {
-        const lines = clone.duplicationA.end.line - clone.duplicationA.start.line;
-        const status = lines >= options.minLines;
-        return {
-            status,
-            message: status ? ['ok'] : [`Lines of code less then limit (${lines} < ${options.minLines})`],
-        };
-    }
-}
-exports.LinesLengthCloneValidator = LinesLengthCloneValidator;
-//# sourceMappingURL=lines-length-clone.validator.js.map
-
-/***/ }),
-
-/***/ 98147:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-function runCloneValidators(clone, options, validators) {
-    return validators.reduce((acc, validator) => {
-        const res = validator.validate(clone, options);
-        return Object.assign(Object.assign({}, acc), { status: res.status && acc.status, message: res.message ? [...acc.message, ...res.message] : acc.message });
-    }, { status: true, message: [], clone });
-}
-exports.runCloneValidators = runCloneValidators;
-//# sourceMappingURL=validator.js.map
-
-/***/ }),
-
-/***/ 37676:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const core_1 = __nccwpck_require__(82576);
-const fast_glob_1 = __nccwpck_require__(43664);
-const tokenizer_1 = __nccwpck_require__(1551);
-const fs_extra_1 = __nccwpck_require__(5630);
-const safe_1 = __nccwpck_require__(41997);
-const fs_1 = __nccwpck_require__(57147);
-const bytes = __nccwpck_require__(86966);
-function isFile(path) {
-    try {
-        const stat = fs_1.lstatSync(path);
-        return stat.isFile();
-    }
-    catch (e) {
-        // lstatSync throws an error if path doesn't exist
-        return false;
-    }
-}
-function skipNotSupportedFormats(options) {
-    return (entry) => {
-        const { path } = entry;
-        const format = tokenizer_1.getFormatByFile(path, options.formatsExts);
-        const shouldNotSkip = format && options.format && options.format.includes(format);
-        if ((options.debug || options.verbose) && !shouldNotSkip) {
-            console.log(`File ${path} skipped! Format "${format}" does not included to supported formats.`);
-        }
-        return shouldNotSkip;
-    };
-}
-function skipBigFiles(options) {
-    return (entry) => {
-        const { stats, path } = entry;
-        const shouldSkip = bytes.parse(stats.size) > bytes.parse(core_1.getOption('maxSize', options));
-        if (options.debug && shouldSkip) {
-            console.log(`File ${path} skipped! Size more then limit (${bytes(stats.size)} > ${core_1.getOption('maxSize', options)})`);
-        }
-        return !shouldSkip;
-    };
-}
-function skipFilesIfLinesOfContentNotInLimits(options) {
-    return (entry) => {
-        const { path, content } = entry;
-        const lines = content.split('\n').length;
-        const minLines = core_1.getOption('minLines', options);
-        const maxLines = core_1.getOption('maxLines', options);
-        if (lines < minLines || lines > maxLines) {
-            if ((options.debug || options.verbose)) {
-                console.log(safe_1.grey(`File ${path} skipped! Code lines=${lines} not in limits (${minLines}:${maxLines})`));
-            }
-            return false;
-        }
-        return true;
-    };
-}
-function addContentToEntry(entry) {
-    const { path } = entry;
-    const content = fs_extra_1.readFileSync(path).toString();
-    return Object.assign(Object.assign({}, entry), { content });
-}
-function getFilesToDetect(options) {
-    const pattern = options.pattern || '**/*';
-    const patterns = options.path.map((path) => {
-        if (isFile(path)) {
-            return path;
-        }
-        return path.substr(path.length - 1) === '/' ? `${path}${pattern}` : `${path}/${pattern}`;
-    });
-    return fast_glob_1.sync(patterns, {
-        ignore: options.ignore,
-        onlyFiles: true,
-        dot: true,
-        stats: true,
-        absolute: options.absolute,
-        followSymbolicLinks: !options.noSymlinks,
-    })
-        .filter(skipNotSupportedFormats(options))
-        .filter(skipBigFiles(options))
-        .map(addContentToEntry)
-        .filter(skipFilesIfLinesOfContentNotInLimits(options));
-}
-exports.getFilesToDetect = getFilesToDetect;
-//# sourceMappingURL=files.js.map
-
-/***/ }),
-
-/***/ 77528:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const blamer_1 = __nccwpck_require__(56781);
-class BlamerHook {
-    process(clones) {
-        return Promise.all(clones.map((clone) => BlamerHook.blameLines(clone)));
-    }
-    static blameLines(clone) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const blamer = new blamer_1.default();
-            const blamedFileA = yield blamer.blameByFile(clone.duplicationA.sourceId);
-            const blamedFileB = yield blamer.blameByFile(clone.duplicationB.sourceId);
-            clone.duplicationA.blame = BlamerHook.getBlamedLines(blamedFileA, clone.duplicationA.start.line, clone.duplicationA.end.line);
-            clone.duplicationB.blame = BlamerHook.getBlamedLines(blamedFileB, clone.duplicationB.start.line, clone.duplicationB.end.line);
-            return clone;
-        });
-    }
-    static getBlamedLines(blamedFiles, start, end) {
-        // TODO rewrite the method
-        const [file] = Object.keys(blamedFiles);
-        const result = {};
-        Object.keys(blamedFiles[file])
-            .filter((lineNumber) => {
-            return Number(lineNumber) >= start && Number(lineNumber) <= end;
-        })
-            .map((lineNumber) => blamedFiles[file][lineNumber])
-            .forEach((info) => {
-            result[info.line] = info;
-        });
-        return result;
-    }
-}
-exports.BlamerHook = BlamerHook;
-//# sourceMappingURL=blamer.js.map
-
-/***/ }),
-
-/***/ 91956:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const fs_1 = __nccwpck_require__(57147);
-class FragmentsHook {
-    process(clones) {
-        return Promise.all(clones.map((clone) => FragmentsHook.addFragments(clone)));
-    }
-    static addFragments(clone) {
-        const codeA = fs_1.readFileSync(clone.duplicationA.sourceId).toString();
-        const codeB = fs_1.readFileSync(clone.duplicationB.sourceId).toString();
-        clone.duplicationA.fragment = codeA.substring(clone.duplicationA.range[0], clone.duplicationA.range[1]);
-        clone.duplicationB.fragment = codeB.substring(clone.duplicationB.range[0], clone.duplicationB.range[1]);
-        return clone;
-    }
-}
-exports.FragmentsHook = FragmentsHook;
-//# sourceMappingURL=fragment.js.map
-
-/***/ }),
-
-/***/ 132:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-function __export(m) {
-    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
-}
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-__export(__nccwpck_require__(77528));
-__export(__nccwpck_require__(91956));
-//# sourceMappingURL=index.js.map
-
-/***/ }),
-
-/***/ 59114:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const core_1 = __nccwpck_require__(82576);
-const tokenizer_1 = __nccwpck_require__(1551);
-const validators_1 = __nccwpck_require__(28758);
-class InFilesDetector {
-    constructor(tokenizer, store, statistic, options) {
-        this.tokenizer = tokenizer;
-        this.store = store;
-        this.statistic = statistic;
-        this.options = options;
-        this.reporters = [];
-        this.subscribes = [];
-        this.postHooks = [];
-        this.registerSubscriber(this.statistic);
-    }
-    registerReporter(reporter) {
-        this.reporters.push(reporter);
-    }
-    registerSubscriber(subscriber) {
-        this.subscribes.push(subscriber);
-    }
-    registerHook(hook) {
-        this.postHooks.push(hook);
-    }
-    detect(fls) {
-        const files = fls.filter((f) => !!f);
-        if (files.length === 0) {
-            return Promise.resolve([]);
-        }
-        const options = this.options;
-        const hooks = [...this.postHooks];
-        const store = this.store;
-        const validators = [];
-        if (options.skipLocal) {
-            validators.push(new validators_1.SkipLocalValidator());
-        }
-        const detector = new core_1.Detector(this.tokenizer, store, validators, options);
-        this.subscribes.forEach((listener) => {
-            Object
-                .entries(listener.subscribe())
-                .map(([event, handler]) => detector.on(event, handler));
-        });
-        const detect = (entry, clones = []) => {
-            const { path, content } = entry;
-            const format = tokenizer_1.getFormatByFile(path, options.formatsExts);
-            return detector
-                .detect(path, content, format)
-                .then((clns) => {
-                if (clns) {
-                    clones.push(...clns);
-                }
-                const file = files.pop();
-                if (file) {
-                    return detect(file, clones);
-                }
-                return clones;
-            });
-        };
-        const processHooks = (hook, detectedClones) => {
-            return hook
-                .process(detectedClones)
-                .then((clones) => {
-                const nextHook = hooks.pop();
-                if (nextHook) {
-                    return processHooks(nextHook, clones);
-                }
-                return clones;
-            });
-        };
-        return detect(files.pop())
-            .then((clones) => {
-            const hook = hooks.pop();
-            if (hook) {
-                return processHooks(hook, clones);
-            }
-            return clones;
-        })
-            .then((clones) => {
-            const statistic = this.statistic.getStatistic();
-            this.reporters.forEach((reporter) => {
-                reporter.report(clones, statistic);
-            });
-            return clones;
-        });
-    }
-}
-exports.InFilesDetector = InFilesDetector;
-//# sourceMappingURL=in-files-detector.js.map
-
-/***/ }),
-
-/***/ 70982:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-function __export(m) {
-    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
-}
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-__export(__nccwpck_require__(59114));
-__export(__nccwpck_require__(37676));
-__export(__nccwpck_require__(132));
-__export(__nccwpck_require__(78846));
-__export(__nccwpck_require__(62556));
-__export(__nccwpck_require__(28758));
-__export(__nccwpck_require__(10206));
-//# sourceMappingURL=index.js.map
-
-/***/ }),
-
-/***/ 32358:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const reports_1 = __nccwpck_require__(98065);
-const clone_found_1 = __nccwpck_require__(31753);
-const safe_1 = __nccwpck_require__(41997);
-const Table = __nccwpck_require__(2101);
-const TABLE_OPTIONS = {
-    chars: {
-        top: '',
-        'top-mid': '',
-        'top-left': '',
-        'top-right': '',
-        bottom: '',
-        'bottom-mid': '',
-        'bottom-left': '',
-        'bottom-right': '',
-        left: '',
-        'left-mid': '',
-        mid: '',
-        'mid-mid': '',
-        right: '',
-        'right-mid': '',
-        middle: '│',
-    },
-};
-class ConsoleFullReporter {
-    constructor(options) {
-        this.options = options;
-    }
-    report(clones) {
-        clones.forEach((clone) => {
-            this.cloneFullFound(clone);
-        });
-        console.log(safe_1.grey(`Found ${clones.length} clones.`));
-    }
-    cloneFullFound(clone) {
-        const table = new Table(TABLE_OPTIONS);
-        clone_found_1.cloneFound(clone, this.options);
-        clone.duplicationA.fragment.split('\n').forEach((line, position) => {
-            (table).push(reports_1.generateLine(clone, position, line));
-        });
-        console.log(table.toString());
-        console.log('');
-    }
-}
-exports.ConsoleFullReporter = ConsoleFullReporter;
-//# sourceMappingURL=console-full.js.map
-
-/***/ }),
-
-/***/ 94091:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const safe_1 = __nccwpck_require__(41997);
-const reports_1 = __nccwpck_require__(98065);
-const Table = __nccwpck_require__(2101);
-class ConsoleReporter {
-    constructor(options) {
-        this.options = options;
-    }
-    report(clones, statistic = undefined) {
-        if (statistic && !this.options.silent) {
-            const table = new Table({
-                head: ['Format', 'Files analyzed', 'Total lines', 'Total tokens', 'Clones found', 'Duplicated lines', 'Duplicated tokens'],
-            });
-            Object.keys(statistic.formats)
-                .filter((format) => statistic.formats[format].sources)
-                .forEach((format) => {
-                table.push(reports_1.convertStatisticToArray(format, statistic.formats[format].total));
-            });
-            table.push(reports_1.convertStatisticToArray(safe_1.bold('Total:'), statistic.total));
-            console.log(table.toString());
-            console.log(safe_1.grey(`Found ${clones.length} clones.`));
-        }
-    }
-}
-exports.ConsoleReporter = ConsoleReporter;
-//# sourceMappingURL=console.js.map
-
-/***/ }),
-
-/***/ 42072:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const core_1 = __nccwpck_require__(82576);
-const fs_extra_1 = __nccwpck_require__(5630);
-const safe_1 = __nccwpck_require__(41997);
-const path_1 = __nccwpck_require__(71017);
-const reports_1 = __nccwpck_require__(98065);
-class CSVReporter {
-    constructor(options) {
-        this.options = options;
-    }
-    report(clones, statistic) {
-        const report = [
-            ['Format', 'Files analyzed', 'Total lines', 'Total tokens', 'Clones found', 'Duplicated lines', 'Duplicated tokens'],
-            ...Object.keys(statistic.formats).map((format) => reports_1.convertStatisticToArray(format, statistic.formats[format].total)),
-            reports_1.convertStatisticToArray('Total:', statistic.total)
-        ].map((arr) => arr.join(',')).join('\n');
-        fs_extra_1.ensureDirSync(core_1.getOption('output', this.options));
-        fs_extra_1.writeFileSync(core_1.getOption('output', this.options) + '/jscpd-report.csv', report);
-        console.log(safe_1.green(`CSV report saved to ${path_1.join(this.options.output, 'jscpd-report.csv')}`));
-    }
-}
-exports.CSVReporter = CSVReporter;
-//# sourceMappingURL=csv.js.map
-
-/***/ }),
-
-/***/ 62556:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-function __export(m) {
-    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
-}
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-__export(__nccwpck_require__(94091));
-__export(__nccwpck_require__(32358));
-__export(__nccwpck_require__(61932));
-__export(__nccwpck_require__(42072));
-__export(__nccwpck_require__(35703));
-__export(__nccwpck_require__(49581));
-__export(__nccwpck_require__(40728));
-__export(__nccwpck_require__(44236));
-__export(__nccwpck_require__(60728));
-//# sourceMappingURL=index.js.map
-
-/***/ }),
-
-/***/ 61932:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const fs_extra_1 = __nccwpck_require__(5630);
-const core_1 = __nccwpck_require__(82576);
-const reports_1 = __nccwpck_require__(98065);
-const safe_1 = __nccwpck_require__(41997);
-const path_1 = __nccwpck_require__(71017);
-class JsonReporter {
-    constructor(options) {
-        this.options = options;
-    }
-    generateJson(clones, statistics) {
-        return {
-            statistics,
-            duplicates: clones.map(clone => this.cloneFound(clone))
-        };
-    }
-    report(clones, statistic) {
-        const json = this.generateJson(clones, statistic);
-        fs_extra_1.ensureDirSync(core_1.getOption('output', this.options));
-        fs_extra_1.writeFileSync(core_1.getOption('output', this.options) + '/jscpd-report.json', JSON.stringify(json, null, '  '));
-        console.log(safe_1.green(`JSON report saved to ${path_1.join(this.options.output, 'jscpd-report.json')}`));
-    }
-    cloneFound(clone) {
-        const startLineA = clone.duplicationA.start.line;
-        const endLineA = clone.duplicationA.end.line;
-        const startLineB = clone.duplicationB.start.line;
-        const endLineB = clone.duplicationB.end.line;
-        return {
-            format: clone.format,
-            lines: endLineA - startLineA + 1,
-            fragment: clone.duplicationA.fragment,
-            tokens: 0,
-            firstFile: {
-                name: reports_1.getPath(clone.duplicationA.sourceId, this.options),
-                start: startLineA,
-                end: endLineA,
-                startLoc: clone.duplicationA.start,
-                endLoc: clone.duplicationA.end,
-                blame: clone.duplicationA.blame,
-            },
-            secondFile: {
-                name: reports_1.getPath(clone.duplicationB.sourceId, this.options),
-                start: startLineB,
-                end: endLineB,
-                startLoc: clone.duplicationB.start,
-                endLoc: clone.duplicationB.end,
-                blame: clone.duplicationB.blame,
-            },
-        };
-    }
-}
-exports.JsonReporter = JsonReporter;
-//# sourceMappingURL=json.js.map
-
-/***/ }),
-
-/***/ 35703:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const core_1 = __nccwpck_require__(82576);
-const fs_extra_1 = __nccwpck_require__(5630);
-const safe_1 = __nccwpck_require__(41997);
-const path_1 = __nccwpck_require__(71017);
-const reports_1 = __nccwpck_require__(98065);
-const table = __nccwpck_require__(41062);
-class MarkdownReporter {
-    constructor(options) {
-        this.options = options;
-    }
-    report(clones, statistic) {
-        const report = `
-# Copy/paste detection report
-
-> Duplications detection: Found ${clones.length} exact clones with ${statistic.total.duplicatedLines}(${statistic.total.percentage}%) duplicated lines in ${statistic.total.sources} (${Object.keys(statistic.formats).length} formats) files.
-
-${table([
-            ['Format', 'Files analyzed', 'Total lines', 'Total tokens', 'Clones found', 'Duplicated lines', 'Duplicated tokens'],
-            ...Object.keys(statistic.formats).map((format) => reports_1.convertStatisticToArray(format, statistic.formats[format].total)),
-            reports_1.convertStatisticToArray('Total:', statistic.total).map(item => `**${item}**`)
-        ])}
-`;
-        fs_extra_1.ensureDirSync(core_1.getOption('output', this.options));
-        fs_extra_1.writeFileSync(core_1.getOption('output', this.options) + '/jscpd-report.md', report);
-        console.log(safe_1.green(`Markdown report saved to ${path_1.join(this.options.output, 'jscpd-report.md')}`));
-    }
-}
-exports.MarkdownReporter = MarkdownReporter;
-//# sourceMappingURL=markdown.js.map
-
-/***/ }),
-
-/***/ 40728:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const safe_1 = __nccwpck_require__(41997);
-class SilentReporter {
-    report(clones, statistic) {
-        if (statistic) {
-            console.log(`Duplications detection: Found ${safe_1.bold(clones.length.toString())} ` +
-                `exact clones with ${safe_1.bold(statistic.total.duplicatedLines.toString())}(${statistic.total.percentage}%) ` +
-                `duplicated lines in ${safe_1.bold(statistic.total.sources.toString())} ` +
-                `(${Object.keys(statistic.formats).length} formats) files.`);
-        }
-    }
-}
-exports.SilentReporter = SilentReporter;
-//# sourceMappingURL=silent.js.map
-
-/***/ }),
-
-/***/ 44236:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const safe_1 = __nccwpck_require__(41997);
-class ThresholdReporter {
-    constructor(options) {
-        this.options = options;
-    }
-    report(clones, statistic) {
-        if (statistic && this.options.threshold !== undefined && this.options.threshold < statistic.total.percentage) {
-            const message = `ERROR: jscpd found too many duplicates (${statistic.total.percentage}%) over threshold (${this.options.threshold}%)`;
-            console.error(safe_1.red(message));
-            throw new Error(message);
-        }
-    }
-}
-exports.ThresholdReporter = ThresholdReporter;
-//# sourceMappingURL=threshold.js.map
-
-/***/ }),
-
-/***/ 60728:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const reports_1 = __nccwpck_require__(98065);
-class XcodeReporter {
-    constructor(options) {
-        this.options = options;
-    }
-    report(clones) {
-        clones.forEach((clone) => {
-            this.cloneFound(clone);
-        });
-        console.log(`Found ${clones.length} clones.`);
-    }
-    cloneFound(clone) {
-        const pathA = reports_1.getPath(clone.duplicationA.sourceId, Object.assign(Object.assign({}, this.options), { absolute: true }));
-        const pathB = reports_1.getPath(clone.duplicationB.sourceId, this.options);
-        const startLineA = clone.duplicationA.start.line;
-        const characterA = clone.duplicationA.start.column;
-        const endLineA = clone.duplicationA.end.line;
-        const startLineB = clone.duplicationB.start.line;
-        const endLineB = clone.duplicationB.end.line;
-        console.log(`${pathA}:${startLineA}:${characterA}: warning: Found ${endLineA - startLineA} lines (${startLineA}-${endLineA}) duplicated on file ${pathB} (${startLineB}-${endLineB})`);
-    }
-}
-exports.XcodeReporter = XcodeReporter;
-//# sourceMappingURL=xcode.js.map
-
-/***/ }),
-
-/***/ 49581:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const fs_1 = __nccwpck_require__(57147);
-const fs_extra_1 = __nccwpck_require__(5630);
-const core_1 = __nccwpck_require__(82576);
-const reports_1 = __nccwpck_require__(98065);
-const safe_1 = __nccwpck_require__(41997);
-const path_1 = __nccwpck_require__(71017);
-class XmlReporter {
-    constructor(options) {
-        this.options = options;
-    }
-    report(clones) {
-        let xmlDoc = '<?xml version="1.0" encoding="UTF-8" ?>';
-        xmlDoc += '<pmd-cpd>';
-        clones.forEach((clone) => {
-            xmlDoc = `${xmlDoc}
-      <duplication lines="${clone.duplicationA.end.line - clone.duplicationA.start.line}">
-            <file path="${reports_1.escapeXml(reports_1.getPath(clone.duplicationA.sourceId, this.options))}" line="${clone.duplicationA.start.line}">
-              <codefragment><![CDATA[${clone.duplicationA.fragment.replace(/]]>/i, 'CDATA_END')}]]></codefragment>
-            </file>
-            <file path="${reports_1.escapeXml(reports_1.getPath(clone.duplicationB.sourceId, this.options))}" line="${clone.duplicationB.start.line}">
-              <codefragment><![CDATA[${clone.duplicationB.fragment.replace(/]]>/i, 'CDATA_END')}]]></codefragment>
-            </file>
-            <codefragment><![CDATA[${clone.duplicationA.fragment.replace(/]]>/i, 'CDATA_END')}]]></codefragment>
-        </duplication>
-      `;
-        });
-        xmlDoc += '</pmd-cpd>';
-        fs_extra_1.ensureDirSync(core_1.getOption('output', this.options));
-        fs_1.writeFileSync(core_1.getOption('output', this.options) + '/jscpd-report.xml', xmlDoc);
-        console.log(safe_1.green(`XML report saved to ${path_1.join(this.options.output, 'jscpd-report.xml')}`));
-    }
-}
-exports.XmlReporter = XmlReporter;
-//# sourceMappingURL=xml.js.map
-
-/***/ }),
-
-/***/ 78846:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-function __export(m) {
-    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
-}
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-__export(__nccwpck_require__(67652));
-__export(__nccwpck_require__(67635));
-//# sourceMappingURL=index.js.map
-
-/***/ }),
-
-/***/ 67652:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const clone_found_1 = __nccwpck_require__(31753);
-class ProgressSubscriber {
-    constructor(options) {
-        this.options = options;
-    }
-    subscribe() {
-        return {
-            CLONE_FOUND: (payload) => clone_found_1.cloneFound(payload.clone, this.options),
-        };
-    }
-}
-exports.ProgressSubscriber = ProgressSubscriber;
-//# sourceMappingURL=progress.js.map
-
-/***/ }),
-
-/***/ 67635:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const safe_1 = __nccwpck_require__(41997);
-class VerboseSubscriber {
-    constructor(options) {
-        this.options = options;
-    }
-    subscribe() {
-        return {
-            'CLONE_FOUND': (payload) => {
-                const { clone } = payload;
-                console.log(safe_1.yellow('CLONE_FOUND'));
-                console.log(safe_1.grey(JSON.stringify(clone, null, '\t')));
-            },
-            'CLONE_SKIPPED': (payload) => {
-                const { validation } = payload;
-                console.log(safe_1.yellow('CLONE_SKIPPED'));
-                console.log(safe_1.grey('Clone skipped: ' + validation.message.join(' ')));
-            },
-            'START_DETECTION': (payload) => {
-                const { source } = payload;
-                console.log(safe_1.yellow('START_DETECTION'));
-                console.log(safe_1.grey('Start detection for source id=' + source.getId() + ' format=' + source.getFormat()));
-            },
-        };
-    }
-}
-exports.VerboseSubscriber = VerboseSubscriber;
-//# sourceMappingURL=verbose.js.map
-
-/***/ }),
-
-/***/ 31753:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const safe_1 = __nccwpck_require__(41997);
-const reports_1 = __nccwpck_require__(98065);
-function cloneFound(clone, options) {
-    const { duplicationA, duplicationB, format, isNew } = clone;
-    console.log('Clone found (' + format + '):' + (isNew ? safe_1.red('*') : ''));
-    console.log(` - ${reports_1.getPathConsoleString(duplicationA.sourceId, options)} [${reports_1.getSourceLocation(duplicationA.start, duplicationA.end)}] (${duplicationA.end.line - duplicationA.start.line} lines${duplicationA.end.position ? ', ' + (duplicationA.end.position - duplicationA.start.position) + ' tokens' : ''})`);
-    console.log(`   ${reports_1.getPathConsoleString(duplicationB.sourceId, options)} [${reports_1.getSourceLocation(duplicationB.start, duplicationB.end)}]`);
-    console.log('');
-}
-exports.cloneFound = cloneFound;
-//# sourceMappingURL=clone-found.js.map
-
-/***/ }),
-
-/***/ 10206:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-function parseFormatsExtensions(extensions = '') {
-    const result = {};
-    if (!extensions) {
-        return undefined;
-    }
-    extensions.split(';').forEach((format) => {
-        const pair = format.split(':');
-        result[pair[0]] = pair[1].split(',');
-    });
-    return result;
-}
-exports.parseFormatsExtensions = parseFormatsExtensions;
-//# sourceMappingURL=options.js.map
-
-/***/ }),
-
-/***/ 98065:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const path_1 = __nccwpck_require__(71017);
-const process_1 = __nccwpck_require__(77282);
-const safe_1 = __nccwpck_require__(41997);
-exports.compareDates = (firstDate, secondDate) => {
-    const first = new Date(firstDate);
-    const second = new Date(secondDate);
-    switch (true) {
-        case first < second:
-            return '=>';
-        case first > second:
-            return '<=';
-        default:
-            return '==';
-    }
-};
-function escapeXml(unsafe) {
-    return unsafe.replace(/[<>&'"]/g, function (c) {
-        switch (c) {
-            case '<': return '&lt;';
-            case '>': return '&gt;';
-            case '&': return '&amp;';
-            case '\'': return '&apos;';
-            case '"': return '&quot;';
-        }
-    });
-}
-exports.escapeXml = escapeXml;
-function getPath(path, options) {
-    return options.absolute ? path : path_1.relative(process_1.cwd(), path);
-}
-exports.getPath = getPath;
-function getPathConsoleString(path, options) {
-    return safe_1.bold(safe_1.green(getPath(path, options)));
-}
-exports.getPathConsoleString = getPathConsoleString;
-function getSourceLocation(start, end) {
-    return `${start.line}:${start.column} - ${end.line}:${end.column}`;
-}
-exports.getSourceLocation = getSourceLocation;
-function generateLine(clone, position, line) {
-    const lineNumberA = (clone.duplicationA.start.line + position).toString();
-    const lineNumberB = (clone.duplicationB.start.line + position).toString();
-    if (clone.duplicationA.blame && clone.duplicationB.blame) {
-        return [
-            lineNumberA,
-            clone.duplicationA.blame[lineNumberA] ? clone.duplicationA.blame[lineNumberA].author : '',
-            clone.duplicationA.blame[lineNumberA] && clone.duplicationB.blame[lineNumberB]
-                ? exports.compareDates(clone.duplicationA.blame[lineNumberA].date, clone.duplicationB.blame[lineNumberB].date)
-                : '',
-            lineNumberB,
-            clone.duplicationB.blame[lineNumberB] ? clone.duplicationB.blame[lineNumberB].author : '',
-            safe_1.grey(line),
-        ];
-    }
-    else {
-        return [lineNumberA, lineNumberB, safe_1.grey(line)];
-    }
-}
-exports.generateLine = generateLine;
-function convertStatisticToArray(format, statistic) {
-    return [
-        format,
-        `${statistic.sources}`,
-        `${statistic.lines}`,
-        `${statistic.tokens}`,
-        `${statistic.clones}`,
-        `${statistic.duplicatedLines} (${statistic.percentage}%)`,
-        `${statistic.duplicatedTokens} (${statistic.percentageTokens}%)`,
-    ];
-}
-exports.convertStatisticToArray = convertStatisticToArray;
-//# sourceMappingURL=reports.js.map
-
-/***/ }),
-
-/***/ 28758:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-function __export(m) {
-    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
-}
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-__export(__nccwpck_require__(85254));
-//# sourceMappingURL=index.js.map
-
-/***/ }),
-
-/***/ 85254:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const core_1 = __nccwpck_require__(82576);
-const path_1 = __nccwpck_require__(71017);
-class SkipLocalValidator {
-    validate(clone, options) {
-        const status = !this.shouldSkipClone(clone, options);
-        return {
-            status,
-            clone,
-            message: [
-                `Sources of duplication located in same local folder (${clone.duplicationA.sourceId}, ${clone.duplicationB.sourceId})`
-            ]
-        };
-    }
-    shouldSkipClone(clone, options) {
-        const path = core_1.getOption('path', options);
-        return path.some((dir) => SkipLocalValidator.isRelative(clone.duplicationA.sourceId, dir) && SkipLocalValidator.isRelative(clone.duplicationB.sourceId, dir));
-    }
-    static isRelative(file, path) {
-        const rel = path_1.relative(path, file);
-        return rel !== '' && !rel.startsWith('..') && !path_1.isAbsolute(rel);
-    }
-}
-exports.SkipLocalValidator = SkipLocalValidator;
-//# sourceMappingURL=skip-local.validator.js.map
-
-/***/ }),
-
-/***/ 24953:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const path_1 = __nccwpck_require__(71017);
-exports.FORMATS = {
-    abap: {
-        exts: [],
-    },
-    actionscript: {
-        exts: ['as'],
-    },
-    ada: {
-        exts: ['ada'],
-    },
-    apacheconf: {
-        exts: [],
-    },
-    apl: {
-        exts: ['apl'],
-    },
-    applescript: {
-        exts: [],
-    },
-    arduino: {
-        exts: [],
-    },
-    arff: {
-        exts: [],
-    },
-    asciidoc: {
-        exts: [],
-    },
-    asm6502: {
-        exts: [],
-    },
-    aspnet: {
-        exts: ['asp', 'aspx'],
-    },
-    autohotkey: {
-        exts: [],
-    },
-    autoit: {
-        exts: [],
-    },
-    bash: {
-        exts: ['sh', 'ksh', 'bash'],
-    },
-    basic: {
-        exts: ['bas'],
-    },
-    batch: {
-        exts: [],
-    },
-    bison: {
-        exts: [],
-    },
-    brainfuck: {
-        exts: ['b', 'bf'],
-    },
-    bro: {
-        exts: [],
-    },
-    c: {
-        exts: ['c', 'z80'],
-    },
-    'c-header': {
-        exts: ['h'],
-        parent: 'c',
-    },
-    clike: {
-        exts: [],
-    },
-    clojure: {
-        exts: ['cljs', 'clj', 'cljc', 'cljx', 'edn'],
-    },
-    coffeescript: {
-        exts: ['coffee'],
-    },
-    comments: {
-        exts: []
-    },
-    cpp: {
-        exts: ['cpp', 'c++', 'cc', 'cxx'],
-    },
-    'cpp-header': {
-        exts: ['hpp', 'h++', 'hh', 'hxx'],
-        parent: 'cpp',
-    },
-    crystal: {
-        exts: ['cr'],
-    },
-    csharp: {
-        exts: ['cs'],
-    },
-    csp: {
-        exts: [],
-    },
-    'css-extras': {
-        exts: [],
-    },
-    css: {
-        exts: ['css', 'gss'],
-    },
-    d: {
-        exts: ['d'],
-    },
-    dart: {
-        exts: ['dart'],
-    },
-    diff: {
-        exts: ['diff', 'patch'],
-    },
-    django: {
-        exts: [],
-    },
-    docker: {
-        exts: [],
-    },
-    eiffel: {
-        exts: ['e'],
-    },
-    elixir: {
-        exts: [],
-    },
-    elm: {
-        exts: ['elm'],
-    },
-    erb: {
-        exts: [],
-    },
-    erlang: {
-        exts: ['erl', 'erlang'],
-    },
-    flow: {
-        exts: [],
-    },
-    fortran: {
-        exts: ['f', 'for', 'f77', 'f90'],
-    },
-    fsharp: {
-        exts: ['fs'],
-    },
-    gedcom: {
-        exts: [],
-    },
-    gherkin: {
-        exts: ['feature'],
-    },
-    git: {
-        exts: [],
-    },
-    glsl: {
-        exts: [],
-    },
-    go: {
-        exts: ['go'],
-    },
-    graphql: {
-        exts: ['graphql'],
-    },
-    groovy: {
-        exts: ['groovy', 'gradle'],
-    },
-    haml: {
-        exts: ['haml'],
-    },
-    handlebars: {
-        exts: ['hb', 'hbs', 'handlebars'],
-    },
-    haskell: {
-        exts: ['hs', 'lhs '],
-    },
-    haxe: {
-        exts: ['hx', 'hxml'],
-    },
-    hpkp: {
-        exts: [],
-    },
-    hsts: {
-        exts: [],
-    },
-    http: {
-        exts: [],
-    },
-    ichigojam: {
-        exts: [],
-    },
-    icon: {
-        exts: [],
-    },
-    inform7: {
-        exts: [],
-    },
-    ini: {
-        exts: ['ini'],
-    },
-    io: {
-        exts: [],
-    },
-    j: {
-        exts: [],
-    },
-    java: {
-        exts: ['java'],
-    },
-    javascript: {
-        exts: ['js', 'es', 'es6'],
-    },
-    jolie: {
-        exts: [],
-    },
-    json: {
-        exts: ['json', 'map', 'jsonld'],
-    },
-    jsx: {
-        exts: ['jsx'],
-    },
-    julia: {
-        exts: ['jl'],
-    },
-    keymap: {
-        exts: [],
-    },
-    kotlin: {
-        exts: ['kt', 'kts'],
-    },
-    latex: {
-        exts: ['tex'],
-    },
-    less: {
-        exts: ['less'],
-    },
-    liquid: {
-        exts: [],
-    },
-    lisp: {
-        exts: ['cl', 'lisp', 'el'],
-    },
-    livescript: {
-        exts: ['ls'],
-    },
-    lolcode: {
-        exts: [],
-    },
-    lua: {
-        exts: ['lua'],
-    },
-    makefile: {
-        exts: [],
-    },
-    markdown: {
-        exts: ['md', 'markdown', 'mkd', 'txt'],
-    },
-    markup: {
-        exts: ['html', 'htm', 'xml', 'xsl', 'xslt', 'svg', 'vue', 'ejs', 'jsp'],
-    },
-    matlab: {
-        exts: [],
-    },
-    mel: {
-        exts: [],
-    },
-    mizar: {
-        exts: [],
-    },
-    monkey: {
-        exts: [],
-    },
-    n4js: {
-        exts: [],
-    },
-    nasm: {
-        exts: [],
-    },
-    nginx: {
-        exts: [],
-    },
-    nim: {
-        exts: [],
-    },
-    nix: {
-        exts: [],
-    },
-    nsis: {
-        exts: ['nsh', 'nsi'],
-    },
-    objectivec: {
-        exts: ['m', 'mm'],
-    },
-    ocaml: {
-        exts: ['ocaml', 'ml', 'mli', 'mll', 'mly'],
-    },
-    opencl: {
-        exts: [],
-    },
-    oz: {
-        exts: ['oz'],
-    },
-    parigp: {
-        exts: [],
-    },
-    pascal: {
-        exts: ['pas', 'p'],
-    },
-    perl: {
-        exts: ['pl', 'pm'],
-    },
-    php: {
-        exts: ['php', 'phtml'],
-    },
-    plsql: {
-        exts: ['plsql'],
-    },
-    powershell: {
-        exts: ['ps1', 'psd1', 'psm1'],
-    },
-    processing: {
-        exts: [],
-    },
-    prolog: {
-        exts: ['pro'],
-    },
-    properties: {
-        exts: ['properties'],
-    },
-    protobuf: {
-        exts: ['proto'],
-    },
-    pug: {
-        exts: ['pug', 'jade'],
-    },
-    puppet: {
-        exts: ['pp', 'puppet'],
-    },
-    pure: {
-        exts: [],
-    },
-    python: {
-        exts: ['py', 'pyx', 'pxd', 'pxi'],
-    },
-    q: {
-        exts: ['q'],
-    },
-    qore: {
-        exts: [],
-    },
-    r: {
-        exts: ['r', 'R'],
-    },
-    reason: {
-        exts: [],
-    },
-    renpy: {
-        exts: [],
-    },
-    rest: {
-        exts: [],
-    },
-    rip: {
-        exts: [],
-    },
-    roboconf: {
-        exts: [],
-    },
-    ruby: {
-        exts: ['rb'],
-    },
-    rust: {
-        exts: ['rs'],
-    },
-    sas: {
-        exts: ['sas'],
-    },
-    sass: {
-        exts: ['sass'],
-    },
-    scala: {
-        exts: ['scala'],
-    },
-    scheme: {
-        exts: ['scm', 'ss'],
-    },
-    scss: {
-        exts: ['scss'],
-    },
-    smalltalk: {
-        exts: ['st'],
-    },
-    smarty: {
-        exts: ['smarty', 'tpl'],
-    },
-    soy: {
-        exts: ['soy'],
-    },
-    sql: {
-        exts: ['sql', 'cql'],
-    },
-    stylus: {
-        exts: ['styl', 'stylus'],
-    },
-    swift: {
-        exts: ['swift'],
-    },
-    tap: {
-        exts: ['tap'],
-    },
-    tcl: {
-        exts: ['tcl'],
-    },
-    textile: {
-        exts: ['textile'],
-    },
-    tsx: {
-        exts: ['tsx'],
-    },
-    tt2: {
-        exts: ['tt2'],
-    },
-    twig: {
-        exts: ['twig'],
-    },
-    typescript: {
-        exts: ['ts'],
-    },
-    vbnet: {
-        exts: ['vb'],
-    },
-    velocity: {
-        exts: ['vtl'],
-    },
-    verilog: {
-        exts: ['v'],
-    },
-    vhdl: {
-        exts: ['vhd', 'vhdl'],
-    },
-    vim: {
-        exts: [],
-    },
-    'visual-basic': {
-        exts: ['vb'],
-    },
-    wasm: {
-        exts: [],
-    },
-    url: {
-        exts: [],
-    },
-    wiki: {
-        exts: [],
-    },
-    xeora: {
-        exts: [],
-    },
-    xojo: {
-        exts: [],
-    },
-    xquery: {
-        exts: ['xy', 'xquery'],
-    },
-    yaml: {
-        exts: ['yaml', 'yml'],
-    },
-};
-function getSupportedFormats() {
-    return Object.keys(exports.FORMATS).filter((name) => name !== 'important' && name !== 'url');
-}
-exports.getSupportedFormats = getSupportedFormats;
-function getFormatByFile(path, formatsExts) {
-    const ext = path_1.extname(path).slice(1);
-    if (formatsExts && Object.keys(formatsExts).length) {
-        return Object.keys(formatsExts).find((format) => formatsExts[format].includes(ext));
-    }
-    return Object.keys(exports.FORMATS).find((language) => exports.FORMATS[language].exts.includes(ext));
-}
-exports.getFormatByFile = getFormatByFile;
-//# sourceMappingURL=formats.js.map
-
-/***/ }),
-
-/***/ 57230:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const reprism = __nccwpck_require__(18042);
-const abap = __nccwpck_require__(65444);
-const actionscript = __nccwpck_require__(21019);
-const ada = __nccwpck_require__(99040);
-const apacheconf = __nccwpck_require__(70629);
-const apl = __nccwpck_require__(13529);
-const applescript = __nccwpck_require__(95394);
-const arff = __nccwpck_require__(56245);
-const asciidoc = __nccwpck_require__(86002);
-const asm6502 = __nccwpck_require__(68737);
-const aspnet = __nccwpck_require__(16326);
-const autohotkey = __nccwpck_require__(3183);
-const autoit = __nccwpck_require__(41502);
-const bash = __nccwpck_require__(15209);
-const basic = __nccwpck_require__(46676);
-const batch = __nccwpck_require__(20986);
-const brainfuck = __nccwpck_require__(64636);
-const bro = __nccwpck_require__(57206);
-const c = __nccwpck_require__(98220);
-const clike = __nccwpck_require__(17403);
-const clojure = __nccwpck_require__(45685);
-const coffeescript = __nccwpck_require__(20525);
-const cpp = __nccwpck_require__(26433);
-const csharp = __nccwpck_require__(3204);
-const csp = __nccwpck_require__(12115);
-const cssExtras = __nccwpck_require__(16590);
-const css = __nccwpck_require__(58302);
-const d = __nccwpck_require__(60310);
-const dart = __nccwpck_require__(14572);
-const diff = __nccwpck_require__(35844);
-const django = __nccwpck_require__(97535);
-const docker = __nccwpck_require__(94508);
-const eiffel = __nccwpck_require__(79209);
-const elixir = __nccwpck_require__(74952);
-const erlang = __nccwpck_require__(15691);
-const flow = __nccwpck_require__(53794);
-const fortran = __nccwpck_require__(90374);
-const fsharp = __nccwpck_require__(63354);
-const gedcom = __nccwpck_require__(25605);
-const gherkin = __nccwpck_require__(14194);
-const git = __nccwpck_require__(96602);
-const glsl = __nccwpck_require__(96860);
-const go = __nccwpck_require__(96509);
-const graphql = __nccwpck_require__(6219);
-const groovy = __nccwpck_require__(90897);
-const haml = __nccwpck_require__(33412);
-const handlebars = __nccwpck_require__(62023);
-const haskell = __nccwpck_require__(2524);
-const haxe = __nccwpck_require__(7267);
-const hpkp = __nccwpck_require__(358);
-const hsts = __nccwpck_require__(42669);
-const http = __nccwpck_require__(7378);
-const ichigojam = __nccwpck_require__(79406);
-const icon = __nccwpck_require__(87849);
-const inform7 = __nccwpck_require__(63411);
-const ini = __nccwpck_require__(49597);
-const io = __nccwpck_require__(28985);
-const j = __nccwpck_require__(83738);
-const java = __nccwpck_require__(47998);
-const javascript = __nccwpck_require__(48430);
-const jolie = __nccwpck_require__(37234);
-const json = __nccwpck_require__(96317);
-const jsx = __nccwpck_require__(16054);
-const julia = __nccwpck_require__(18521);
-const keyman = __nccwpck_require__(1453);
-const kotlin = __nccwpck_require__(69707);
-const latex = __nccwpck_require__(78387);
-const less = __nccwpck_require__(25526);
-const liquid = __nccwpck_require__(110);
-const lisp = __nccwpck_require__(5716);
-const livescript = __nccwpck_require__(4273);
-const lolcode = __nccwpck_require__(78908);
-const lua = __nccwpck_require__(28482);
-const makefile = __nccwpck_require__(65822);
-const markdown = __nccwpck_require__(20518);
-const markupTemplating = __nccwpck_require__(8914);
-const markup = __nccwpck_require__(42152);
-const matlab = __nccwpck_require__(21372);
-const mel = __nccwpck_require__(19177);
-const mizar = __nccwpck_require__(37457);
-const monkey = __nccwpck_require__(26314);
-const n4js = __nccwpck_require__(41630);
-const nasm = __nccwpck_require__(57062);
-const nginx = __nccwpck_require__(44909);
-const nim = __nccwpck_require__(64441);
-const nix = __nccwpck_require__(51758);
-const nsis = __nccwpck_require__(47159);
-const objectivec = __nccwpck_require__(41466);
-const ocaml = __nccwpck_require__(20505);
-const opencl = __nccwpck_require__(24484);
-const oz = __nccwpck_require__(70834);
-const parigp = __nccwpck_require__(29775);
-const parser = __nccwpck_require__(28480);
-const pascal = __nccwpck_require__(98305);
-const perl = __nccwpck_require__(46306);
-const phpExtras = __nccwpck_require__(78800);
-const php = __nccwpck_require__(92619);
-const powershell = __nccwpck_require__(31896);
-const processing = __nccwpck_require__(63028);
-const prolog = __nccwpck_require__(11831);
-const properties = __nccwpck_require__(6971);
-const protobuf = __nccwpck_require__(9802);
-const pug = __nccwpck_require__(47602);
-const puppet = __nccwpck_require__(16015);
-const pure = __nccwpck_require__(96047);
-const python = __nccwpck_require__(42212);
-const q = __nccwpck_require__(70061);
-const qore = __nccwpck_require__(97631);
-const r = __nccwpck_require__(20420);
-const reason = __nccwpck_require__(39443);
-const renpy = __nccwpck_require__(48755);
-const rest = __nccwpck_require__(57652);
-const rip = __nccwpck_require__(11090);
-const roboconf = __nccwpck_require__(72149);
-const ruby = __nccwpck_require__(40415);
-const rust = __nccwpck_require__(93399);
-const sas = __nccwpck_require__(96939);
-const sass = __nccwpck_require__(37650);
-const scala = __nccwpck_require__(60988);
-const scheme = __nccwpck_require__(14150);
-const scss = __nccwpck_require__(56838);
-const smalltalk = __nccwpck_require__(81200);
-const smarty = __nccwpck_require__(94171);
-const soy = __nccwpck_require__(89135);
-const stylus = __nccwpck_require__(94920);
-const swift = __nccwpck_require__(58479);
-const tcl = __nccwpck_require__(59758);
-const textile = __nccwpck_require__(38347);
-const tsx = __nccwpck_require__(13220);
-const twig = __nccwpck_require__(99323);
-const typescript = __nccwpck_require__(148);
-const vbnet = __nccwpck_require__(15305);
-const velocity = __nccwpck_require__(16657);
-const verilog = __nccwpck_require__(26734);
-const vhdl = __nccwpck_require__(19450);
-const vim = __nccwpck_require__(38565);
-const visualBasic = __nccwpck_require__(58229);
-const wasm = __nccwpck_require__(63735);
-const wiki = __nccwpck_require__(9213);
-const xeora = __nccwpck_require__(93867);
-const xojo = __nccwpck_require__(81975);
-const yaml = __nccwpck_require__(54163);
-const tap = __nccwpck_require__(41280);
-const sql = __nccwpck_require__(71439);
-const plsql = __nccwpck_require__(71352);
-exports.languages = {
-    abap, actionscript, ada, apacheconf, apl, applescript, arff,
-    asciidoc, asm6502, aspnet, autohotkey, autoit, bash, basic, batch,
-    brainfuck, bro, c, clike, clojure, coffeescript, cpp, csharp, csp, cssExtras,
-    css, d, dart, diff, django, docker, eiffel, elixir, erlang, flow, fortran, fsharp,
-    gedcom, gherkin, git, glsl, go, graphql, groovy, haml, handlebars, haskell, haxe,
-    hpkp, hsts, http, ichigojam, icon, inform7, ini, io, j, java, javascript, jolie,
-    json, jsx, julia, keyman, kotlin, latex, less, liquid, lisp, livescript,
-    lolcode, lua, makefile, markdown, markupTemplating, markup, matlab, mel, mizar,
-    monkey, n4js, nasm, nginx, nim, nix, nsis, objectivec, ocaml, opencl, oz, parigp,
-    parser, pascal, perl, php, phpExtras, powershell, processing, prolog,
-    properties, protobuf, pug, puppet, pure, python, q, qore, r, reason, renpy, rest,
-    rip, roboconf, ruby, rust, sas, sass, scala, scheme, scss, smalltalk, smarty, soy,
-    stylus, swift, tcl, textile, twig, typescript, vbnet, velocity, verilog, vhdl,
-    vim, visualBasic, wasm, wiki, xeora, xojo, yaml, tsx, sql, plsql, tap
-};
-exports.loadLanguages = () => {
-    reprism.loadLanguages(Object.values(exports.languages).map(v => v.default));
-};
-//# sourceMappingURL=grammar-loader.js.map
-
-/***/ }),
-
-/***/ 93175:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const SparkMD5 = __nccwpck_require__(70220);
-function hash(value) {
-    return SparkMD5.hash(value);
-}
-exports.hash = hash;
-//# sourceMappingURL=hash.js.map
-
-/***/ }),
-
-/***/ 1551:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-function __export(m) {
-    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
-}
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const tokenize_1 = __nccwpck_require__(74092);
-__export(__nccwpck_require__(74092));
-__export(__nccwpck_require__(73303));
-__export(__nccwpck_require__(24953));
-class Tokenizer {
-    generateMaps(id, data, format, options) {
-        return tokenize_1.createTokenMapBasedOnCode(id, data, format, options);
-    }
-}
-exports.Tokenizer = Tokenizer;
-//# sourceMappingURL=index.js.map
-
-/***/ }),
-
-/***/ 71352:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const grammar = {
-    language: 'plsql',
-    init(Prism) {
-        Prism.languages.plsql = Prism.languages.extend('sql', {
-            comment: [/\/\*[\s\S]*?\*\//, /--.*/],
-        });
-        if (Prism.util.type(Prism.languages.plsql.keyword) !== 'Array') {
-            Prism.languages.plsql.keyword = [Prism.languages.plsql.keyword];
-        }
-        Prism.languages.plsql.keyword.unshift(/\b(?:ACCESS|AGENT|AGGREGATE|ARRAY|ARROW|AT|ATTRIBUTE|AUDIT|AUTHID|BFILE_BASE|BLOB_BASE|BLOCK|BODY|BOTH|BOUND|BYTE|CALLING|CHAR_BASE|CHARSET(?:FORM|ID)|CLOB_BASE|COLAUTH|COLLECT|CLUSTERS?|COMPILED|COMPRESS|CONSTANT|CONSTRUCTOR|CONTEXT|CRASH|CUSTOMDATUM|DANGLING|DATE_BASE|DEFINE|DETERMINISTIC|DURATION|ELEMENT|EMPTY|EXCEPTIONS?|EXCLUSIVE|EXTERNAL|FINAL|FORALL|FORM|FOUND|GENERAL|HEAP|HIDDEN|IDENTIFIED|IMMEDIATE|INCLUDING|INCREMENT|INDICATOR|INDEXES|INDICES|INFINITE|INITIAL|ISOPEN|INSTANTIABLE|INTERFACE|INVALIDATE|JAVA|LARGE|LEADING|LENGTH|LIBRARY|LIKE[24C]|LIMITED|LONG|LOOP|MAP|MAXEXTENTS|MAXLEN|MEMBER|MINUS|MLSLABEL|MULTISET|NAME|NAN|NATIVE|NEW|NOAUDIT|NOCOMPRESS|NOCOPY|NOTFOUND|NOWAIT|NUMBER(?:_BASE)?|OBJECT|OCI(?:COLL|DATE|DATETIME|DURATION|INTERVAL|LOBLOCATOR|NUMBER|RAW|REF|REFCURSOR|ROWID|STRING|TYPE)|OFFLINE|ONLINE|ONLY|OPAQUE|OPERATOR|ORACLE|ORADATA|ORGANIZATION|ORL(?:ANY|VARY)|OTHERS|OVERLAPS|OVERRIDING|PACKAGE|PARALLEL_ENABLE|PARAMETERS?|PASCAL|PCTFREE|PIPE(?:LINED)?|PRAGMA|PRIOR|PRIVATE|RAISE|RANGE|RAW|RECORD|REF|REFERENCE|REM|REMAINDER|RESULT|RESOURCE|RETURNING|REVERSE|ROW(?:ID|NUM|TYPE)|SAMPLE|SB[124]|SEGMENT|SELF|SEPARATE|SEQUENCE|SHORT|SIZE(?:_T)?|SPARSE|SQL(?:CODE|DATA|NAME|STATE)|STANDARD|STATIC|STDDEV|STORED|STRING|STRUCT|STYLE|SUBMULTISET|SUBPARTITION|SUBSTITUTABLE|SUBTYPE|SUCCESSFUL|SYNONYM|SYSDATE|TABAUTH|TDO|THE|TIMEZONE_(?:ABBR|HOUR|MINUTE|REGION)|TRAILING|TRANSAC(?:TIONAL)?|TRUSTED|UB[124]|UID|UNDER|UNTRUSTED|VALIDATE|VALIST|VARCHAR2|VARIABLE|VARIANCE|VARRAY|VIEWS|VOID|WHENEVER|WRAPPED|ZONE)\b/i);
-        if (Prism.util.type(Prism.languages.plsql.operator) !== 'Array') {
-            Prism.languages.plsql.operator = [Prism.languages.plsql.operator];
-        }
-        Prism.languages.plsql.operator.unshift(/:=/);
-    },
-};
-exports["default"] = grammar;
-//# sourceMappingURL=plsql.js.map
-
-/***/ }),
-
-/***/ 71439:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const grammar = {
-    language: 'sql',
-    init(Prism) {
-        Prism.languages.sql = {
-            'comment': {
-                pattern: /(^|[^\\])(?:\/\*[\s\S]*?\*\/|(?:--|\/\/|#).*)/,
-                lookbehind: true,
-            },
-            'variable': [
-                {
-                    pattern: /@(["'`])(?:\\[\s\S]|(?!\1)[^\\])+\1/,
-                    greedy: true,
-                },
-                /@[\w.$]+/,
-            ],
-            'string': {
-                pattern: /(^|[^@\\])("|')(?:\\[\s\S]|(?!\2)[^\\]|\2\2)*\2/,
-                greedy: true,
-                lookbehind: true,
-            },
-            'function': /\b(?:AVG|COUNT|FIRST|FORMAT|LAST|LCASE|LEN|MAX|MID|MIN|MOD|NOW|ROUND|SUM|UCASE)(?=\s*\()/i,
-            'keyword': /\b(?:ACTION|ADD|AFTER|ALGORITHM|ALL|ALTER|ANALYZE|ANY|APPLY|AS|ASC|AUTHORIZATION|AUTO_INCREMENT|BACKUP|BDB|BEGIN|BERKELEYDB|BIGINT|BINARY|BIT|BLOB|BOOL|BOOLEAN|BREAK|BROWSE|BTREE|BULK|BY|CALL|CASCADED?|CASE|CHAIN|CHAR(?:ACTER|SET)?|CHECK(?:POINT)?|CLOSE|CLUSTERED|COALESCE|COLLATE|COLUMNS?|COMMENT|COMMIT(?:TED)?|COMPUTE|CONNECT|CONSISTENT|CONSTRAINT|CONTAINS(?:TABLE)?|CONTINUE|CONVERT|CREATE|CROSS|CURRENT(?:_DATE|_TIME|_TIMESTAMP|_USER)?|CURSOR|CYCLE|DATA(?:BASES?)?|DATE(?:TIME)?|DAY|DBCC|DEALLOCATE|DEC|DECIMAL|DECLARE|DEFAULT|DEFINER|DELAYED|DELETE|DELIMITERS?|DENY|DESC|DESCRIBE|DETERMINISTIC|DISABLE|DISCARD|DISK|DISTINCT|DISTINCTROW|DISTRIBUTED|DO|DOUBLE|DROP|DUMMY|DUMP(?:FILE)?|DUPLICATE|ELSE(?:IF)?|ENABLE|ENCLOSED|END|ENGINE|ENUM|ERRLVL|ERRORS|ESCAPED?|EXCEPT|EXEC(?:UTE)?|EXISTS|EXIT|EXPLAIN|EXTENDED|FETCH|FIELDS|FILE|FILLFACTOR|FIRST|FIXED|FLOAT|FOLLOWING|FOR(?: EACH ROW)?|FORCE|FOREIGN|FREETEXT(?:TABLE)?|FROM|FULL|FUNCTION|GEOMETRY(?:COLLECTION)?|GLOBAL|GOTO|GRANT|GROUP|HANDLER|HASH|HAVING|HOLDLOCK|HOUR|IDENTITY(?:_INSERT|COL)?|IF|IGNORE|IMPORT|INDEX|INFILE|INNER|INNODB|INOUT|INSERT|INT|INTEGER|INTERSECT|INTERVAL|INTO|INVOKER|ISOLATION|ITERATE|JOIN|KEYS?|KILL|LANGUAGE|LAST|LEAVE|LEFT|LEVEL|LIMIT|LINENO|LINES|LINESTRING|LOAD|LOCAL|LOCK|LONG(?:BLOB|TEXT)|LOOP|MATCH(?:ED)?|MEDIUM(?:BLOB|INT|TEXT)|MERGE|MIDDLEINT|MINUTE|MODE|MODIFIES|MODIFY|MONTH|MULTI(?:LINESTRING|POINT|POLYGON)|NATIONAL|NATURAL|NCHAR|NEXT|NO|NONCLUSTERED|NULLIF|NUMERIC|OFF?|OFFSETS?|ON|OPEN(?:DATASOURCE|QUERY|ROWSET)?|OPTIMIZE|OPTION(?:ALLY)?|ORDER|OUT(?:ER|FILE)?|OVER|PARTIAL|PARTITION|PERCENT|PIVOT|PLAN|POINT|POLYGON|PRECEDING|PRECISION|PREPARE|PREV|PRIMARY|PRINT|PRIVILEGES|PROC(?:EDURE)?|PUBLIC|PURGE|QUICK|RAISERROR|READS?|REAL|RECONFIGURE|REFERENCES|RELEASE|RENAME|REPEAT(?:ABLE)?|REPLACE|REPLICATION|REQUIRE|RESIGNAL|RESTORE|RESTRICT|RETURNS?|REVOKE|RIGHT|ROLLBACK|ROUTINE|ROW(?:COUNT|GUIDCOL|S)?|RTREE|RULE|SAVE(?:POINT)?|SCHEMA|SECOND|SELECT|SERIAL(?:IZABLE)?|SESSION(?:_USER)?|SET(?:USER)?|SHARE|SHOW|SHUTDOWN|SIMPLE|SMALLINT|SNAPSHOT|SOME|SONAME|SQL|START(?:ING)?|STATISTICS|STATUS|STRIPED|SYSTEM_USER|TABLES?|TABLESPACE|TEMP(?:ORARY|TABLE)?|TERMINATED|TEXT(?:SIZE)?|THEN|TIME(?:STAMP)?|TINY(?:BLOB|INT|TEXT)|TOP?|TRAN(?:SACTIONS?)?|TRIGGER|TRUNCATE|TSEQUAL|TYPES?|UNBOUNDED|UNCOMMITTED|UNDEFINED|UNION|UNIQUE|UNLOCK|UNPIVOT|UNSIGNED|UPDATE(?:TEXT)?|USAGE|USE|USER|USING|VALUES?|VAR(?:BINARY|CHAR|CHARACTER|YING)|VIEW|WAITFOR|WARNINGS|WHEN|WHERE|WHILE|WITH(?: ROLLUP|IN)?|WORK|WRITE(?:TEXT)?|YEAR)\b/i,
-            'boolean': /\b(?:TRUE|FALSE|NULL)\b/i,
-            'number': /\b0x[\da-f]+\b|\b\d+\.?\d*|\B\.\d+\b/i,
-            'operator': /[-+*\/=%^~]|&&?|\|\|?|!=?|<(?:=>?|<|>)?|>[>=]?|\b(?:AND|BETWEEN|IN|LIKE|NOT|OR|IS|DIV|REGEXP|RLIKE|SOUNDS LIKE|XOR)\b/i,
-            'punctuation': /[;[\]()`,.]/,
-        };
-    },
-};
-exports["default"] = grammar;
-//# sourceMappingURL=sql.js.map
-
-/***/ }),
-
-/***/ 41280:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const grammar = {
-    language: 'tap',
-    init(Prism) {
-        Prism.languages.tap = {
-            fail: /not ok[^#{\n\r]*/,
-            pass: /ok[^#{\n\r]*/,
-            pragma: /pragma [+-][a-z]+/,
-            bailout: /bail out!.*/i,
-            version: /TAP version \d+/i,
-            plan: /\d+\.\.\d+(?: +#.*)?/,
-            subtest: {
-                pattern: /# Subtest(?:: .*)?/,
-                greedy: true
-            },
-            punctuation: /[{}]/,
-            directive: /#.*/,
-            yamlish: {
-                pattern: /(^[ \t]*)---[\s\S]*?[\r\n][ \t]*\.\.\.$/m,
-                lookbehind: true,
-                inside: Prism.languages.yaml,
-                alias: 'language-yaml'
-            }
-        };
-    },
-};
-exports["default"] = grammar;
-//# sourceMappingURL=tap.js.map
-
-/***/ }),
-
-/***/ 73303:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const hash_1 = __nccwpck_require__(93175);
-const TOKEN_HASH_LENGTH = 20;
-function createTokenHash(token, hashFunction = undefined) {
-    return hashFunction ?
-        hashFunction(token.type + token.value).substr(0, TOKEN_HASH_LENGTH) :
-        hash_1.hash(token.type + token.value).substr(0, TOKEN_HASH_LENGTH);
-}
-function groupByFormat(tokens) {
-    const result = {};
-    // TODO change to reduce
-    tokens.forEach((token) => {
-        (result[token.format] = result[token.format] ? [...result[token.format], token] : [token]);
-    });
-    return result;
-}
-class TokensMap {
-    constructor(id, data, tokens, format, options) {
-        this.id = id;
-        this.data = data;
-        this.tokens = tokens;
-        this.format = format;
-        this.options = options;
-        this.position = 0;
-        this.hashMap = this.tokens.map((token) => {
-            if (options.ignoreCase) {
-                token.value = token.value.toLocaleLowerCase();
-            }
-            return createTokenHash(token, this.options.hashFunction);
-        }).join('');
-    }
-    getTokensCount() {
-        return this.tokens[this.tokens.length - 1].loc.end.position - this.tokens[0].loc.start.position;
-    }
-    getId() {
-        return this.id;
-    }
-    getLinesCount() {
-        return this.tokens[this.tokens.length - 1].loc.end.line - this.tokens[0].loc.start.line;
-    }
-    getFormat() {
-        return this.format;
-    }
-    [Symbol.iterator]() {
-        return this;
-    }
-    next() {
-        const hashFunction = this.options.hashFunction ? this.options.hashFunction : hash_1.hash;
-        const mapFrame = hashFunction(this.hashMap.substring(this.position * TOKEN_HASH_LENGTH, this.position * TOKEN_HASH_LENGTH + this.options.minTokens * TOKEN_HASH_LENGTH)).substring(0, TOKEN_HASH_LENGTH);
-        if (this.position < this.tokens.length - this.options.minTokens) {
-            this.position++;
-            return {
-                done: false,
-                value: {
-                    id: mapFrame,
-                    sourceId: this.getId(),
-                    start: this.tokens[this.position - 1],
-                    end: this.tokens[this.position + this.options.minTokens - 1],
-                },
-            };
-        }
-        else {
-            return {
-                done: true,
-                value: false,
-            };
-        }
-    }
-}
-exports.TokensMap = TokensMap;
-function generateMapsForFormats(id, data, tokens, options) {
-    return Object
-        .values(groupByFormat(tokens))
-        .map((formatTokens) => new TokensMap(id, data, formatTokens, formatTokens[0].format, options));
-}
-exports.generateMapsForFormats = generateMapsForFormats;
-function createTokensMaps(id, data, tokens, options) {
-    return generateMapsForFormats(id, data, tokens, options);
-}
-exports.createTokensMaps = createTokensMaps;
-//# sourceMappingURL=token-map.js.map
-
-/***/ }),
-
-/***/ 74092:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const reprism = __nccwpck_require__(18042);
-const formats_1 = __nccwpck_require__(24953);
-const token_map_1 = __nccwpck_require__(73303);
-const grammar_loader_1 = __nccwpck_require__(57230);
-const ignore = {
-    ignore: [
-        {
-            pattern: /(jscpd:ignore-start)[\s\S]*?(?=jscpd:ignore-end)/,
-            lookbehind: true,
-            greedy: true,
-        },
-        {
-            pattern: /jscpd:ignore-start/,
-            greedy: false,
-        },
-        {
-            pattern: /jscpd:ignore-end/,
-            greedy: false,
-        },
-    ],
-};
-const punctuation = {
-    // eslint-disable-next-line @typescript-eslint/camelcase
-    new_line: /\n/,
-    empty: /\s+/,
-};
-const initializeFormats = () => {
-    grammar_loader_1.loadLanguages();
-    Object
-        .keys(reprism.default.languages)
-        .forEach((lang) => {
-        if (lang !== 'extend' && lang !== 'insertBefore' && lang !== 'DFS') {
-            reprism.default.languages[lang] = Object.assign(Object.assign(Object.assign({}, ignore), reprism.default.languages[lang]), punctuation);
-        }
-    });
-};
-initializeFormats();
-function getLanguagePrismName(lang) {
-    if (lang in formats_1.FORMATS && formats_1.FORMATS[lang].parent) {
-        return formats_1.FORMATS[lang].parent;
-    }
-    return lang;
-}
-function tokenize(code, language) {
-    let length = 0;
-    let line = 1;
-    let column = 1;
-    function sanitizeLangName(name) {
-        return name && name.replace ? name.replace('language-', '') : 'unknown';
-    }
-    function createTokenFromString(token, lang) {
-        return [
-            {
-                format: lang,
-                type: 'default',
-                value: token,
-                length: token.length,
-            },
-        ];
-    }
-    function calculateLocation(token, position) {
-        const result = token;
-        const lines = typeof result.value === 'string' && result.value.split ? result.value.split('\n') : [];
-        const newLines = lines.length - 1;
-        const start = {
-            line,
-            column,
-            position
-        };
-        column = newLines >= 0 ? lines[lines.length - 1].length + 1 : column;
-        const end = {
-            line: line + newLines,
-            column,
-            position
-        };
-        result.loc = { start, end };
-        result.range = [length, length + result.length];
-        length += result.length;
-        line += newLines;
-        return result;
-    }
-    function createTokenFromFlatToken(token, lang) {
-        return [
-            {
-                format: lang,
-                type: token.type,
-                value: token.content,
-                length: token.length,
-            },
-        ];
-    }
-    function createTokens(token, lang) {
-        if (token.content && typeof token.content === 'string') {
-            return createTokenFromFlatToken(token, lang);
-        }
-        if (token.content && Array.isArray(token.content)) {
-            let res = [];
-            token.content.forEach((t) => (res = res.concat(createTokens(t, token.alias ? sanitizeLangName(token.alias) : lang))));
-            return res;
-        }
-        return createTokenFromString(token, lang);
-    }
-    let tokens = [];
-    const grammar = reprism.default.languages[getLanguagePrismName(language)];
-    if (!reprism.default.languages[getLanguagePrismName(language)]) {
-        console.warn('Warn: jscpd has issue with support of "' + getLanguagePrismName(language) + '"');
-        return [];
-    }
-    reprism.default.tokenize(code, grammar)
-        .forEach((t) => (tokens = tokens.concat(createTokens(t, language))));
-    return tokens
-        .filter((t) => t.format in formats_1.FORMATS)
-        .map((token, index) => calculateLocation(token, index));
-}
-exports.tokenize = tokenize;
-function setupIgnorePatterns(format, ignorePattern) {
-    const language = getLanguagePrismName(format);
-    const ignorePatterns = ignorePattern.map(pattern => ({
-        pattern: new RegExp(pattern),
-        greedy: false,
-    }));
-    reprism.default.languages[language] = Object.assign(Object.assign({}, ignorePatterns), reprism.default.languages[language]);
-}
-function createTokenMapBasedOnCode(id, data, format, options = {}) {
-    const { mode, ignoreCase, ignorePattern } = options;
-    const tokens = tokenize(data, format)
-        .filter((token) => mode(token, options));
-    if (ignorePattern)
-        setupIgnorePatterns(format, options.ignorePattern);
-    if (ignoreCase) {
-        return token_map_1.createTokensMaps(id, data, tokens.map((token) => {
-            token.value = token.value.toLocaleLowerCase();
-            return token;
-        }), options);
-    }
-    return token_map_1.createTokensMaps(id, data, tokens, options);
-}
-exports.createTokenMapBasedOnCode = createTokenMapBasedOnCode;
-//# sourceMappingURL=tokenize.js.map
 
 /***/ }),
 

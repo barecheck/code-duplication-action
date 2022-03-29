@@ -1,17 +1,28 @@
 const core = require("@actions/core");
-const { detectClones } = require("barecheck");
+const { detectClones } = require("@barecheck/clones");
+const { getClonesReportBody, githubApi } = require("@barecheck/core");
+
+const { getPullRequestContext, getOctokit } = require("./lib/github");
 
 const { commentTitle } = require("./config");
-const buildBody = require("./github/comment/buildBody");
-const createOrUpdateComment = require("./github/createOrUpdateComment");
 
 async function main() {
   try {
-    const { statistic, clones } = await detectClones(["./src"], {});
+    // TODO: get path from action.yml
+    const { statistic } = await detectClones(["./src"], {});
 
-    const body = buildBody(statistic, clones);
+    const pullRequestContext = getPullRequestContext();
+    const body = getClonesReportBody(commentTitle, statistic);
 
-    await createOrUpdateComment(commentTitle, body);
+    const octokit = await getOctokit();
+    const { repo, owner, pullNumber } = pullRequestContext;
+    await githubApi.createOrUpdateComment(octokit, {
+      owner,
+      repo,
+      issueNumber: pullNumber,
+      searchBody: commentTitle,
+      body
+    });
   } catch (err) {
     core.info(err);
     core.setFailed(err.message);

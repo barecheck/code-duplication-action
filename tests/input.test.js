@@ -55,4 +55,27 @@ describe("input", () => {
       })
     );
   });
+
+  describe("getGithubToken", () => {
+    [
+      { input: "value1", expected: "value1" },
+      { input: "", expected: false },
+      { input: "false", expected: false },
+      { input: "False", expected: false }
+    ].forEach(({ input, expected }) =>
+      it(`should return ${expected} when  'barecheck-api-key=${input}'`, () => {
+        const expectedRes = "path-lcov-file";
+        const getInput = sinon
+          .stub()
+          .withArgs("github-token")
+          .returns(expectedRes);
+
+        const { getGithubToken } = inputMock({ getInput });
+
+        const res = getGithubToken();
+
+        assert.equal(res, expectedRes);
+      })
+    );
+  });
 });

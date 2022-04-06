@@ -7,6 +7,9 @@ inputs:
   barecheck-github-app-token:
     description: Barecheck application token, received after application installation
     required: true
+  barecheck-api-key:
+    description: Barecheck project API key
+    required: false
   lines-threshold:
     description: "Minimum code duplications lines threshold percentage that would fail a build once it reached"
     default: "1"

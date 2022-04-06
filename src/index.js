@@ -3,6 +3,7 @@ const { detectClones } = require("@barecheck/clones");
 const { getClonesReportBody, githubApi } = require("@barecheck/core");
 
 const { getPullRequestContext, getOctokit } = require("./lib/github");
+const { sendCurrentClones } = require("./lib/api");
 
 const { commentTitle } = require("./config");
 
@@ -23,6 +24,11 @@ async function main() {
       searchBody: commentTitle,
       body
     });
+
+    await sendCurrentClones(
+      statistic.total.percentage,
+      statistic.total.percentageTokens
+    );
   } catch (err) {
     core.info(err);
     core.setFailed(err.message);

@@ -4,8 +4,8 @@
   "description": "GitHub Action that posts generates code duplication reports",
   "main": "src/index.js",
   "dependencies": {
-    "@barecheck/clones": "^0.3.0",
-    "@barecheck/core": "^0.3.0",
+    "@barecheck/clones": "^0.4.0",
+    "@barecheck/core": "^0.4.0",
     "@actions/core": "^1.6.0",
     "@actions/github": "^5.0.0"
   },

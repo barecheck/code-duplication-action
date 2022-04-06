@@ -3694,7 +3694,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.coverageMetrics = exports.createCoverageMetric = exports.authProject = exports.createGithubAccessToken = void 0;
+exports.clonesMetrics = exports.createClonesMetric = exports.coverageMetrics = exports.createCoverageMetric = exports.authProject = exports.createGithubAccessToken = void 0;
 const axios_1 = __importDefault(__nccwpck_require__(96545));
 const config_1 = __nccwpck_require__(8919);
 // TODO: define api request response interfaces
@@ -3778,6 +3778,55 @@ const coverageMetrics = (accessToken, variables) => __awaiter(void 0, void 0, vo
     return response.data.coverageMetrics;
 });
 exports.coverageMetrics = coverageMetrics;
+const createClonesMetric = (accessToken, variables) => __awaiter(void 0, void 0, void 0, function* () {
+    const query = `mutation createClonesMetric(
+    $projectId: Int!,
+    $totalLinesPercentage: Float!,
+    $totalBranchesPercentage: Float!,
+    $ref: String!,
+    $sha: String!) {
+      createClonesMetric(input: {
+        projectId: $projectId,
+        totalLinesPercentage: $totalLinesPercentage,
+        totalBranchesPercentage: $totalBranchesPercentage,
+        ref: $ref,
+        sha: $sha }) {
+          id
+          totalLinesPercentage
+          totalBranchesPercentage
+          ref
+          sha
+          createdAt
+          updatedAt
+      }
+  }
+  `;
+    const response = yield makeRequest(accessToken, query, variables);
+    if (!response.data) {
+        throw new Error("Couldn't send your project clones metric. Check if `accessToken` is valid or receive new one by using `authProject` mutation");
+    }
+    return response.data.createClonesMetric;
+});
+exports.createClonesMetric = createClonesMetric;
+const clonesMetrics = (accessToken, variables) => __awaiter(void 0, void 0, void 0, function* () {
+    const query = `query clonesMetrics($projectId: Int!, $ref: String, $dateTo: DateTime, $take: Int ) {
+    clonesMetrics(projectId: $projectId, ref:$ref, dateTo: $dateTo, take: $take){
+      id
+      ref
+      sha
+      totalLinesPercentage
+      totalBranchesPercentage
+      createdAt
+    }
+  }
+  `;
+    const response = yield makeRequest(accessToken, query, variables);
+    if (!response.data) {
+        return null;
+    }
+    return response.data.clonesMetrics;
+});
+exports.clonesMetrics = clonesMetrics;
 //# sourceMappingURL=endpoints.js.map
 
 /***/ }),
@@ -3847,13 +3896,13 @@ const fetchCoverage = (apiKey, ref) => __awaiter(void 0, void 0, void 0, functio
 exports.fetchCoverage = fetchCoverage;
 const sendCoverage = (apiKey, totalCoverage, ref, sha) => __awaiter(void 0, void 0, void 0, function* () {
     const { accessToken, project } = yield (0, endpoints_1.authProject)({ apiKey });
-    const [latestCoverage] = yield (0, endpoints_1.createCoverageMetric)(accessToken, {
+    const createdCoverage = yield (0, endpoints_1.createCoverageMetric)(accessToken, {
         projectId: project.id,
         ref,
         sha,
         totalCoverage
     });
-    return latestCoverage ? latestCoverage.totalCoverage : 0;
+    return createdCoverage.totalCoverage;
 });
 exports.sendCoverage = sendCoverage;
 //# sourceMappingURL=index.js.map
@@ -4072,8 +4121,8 @@ exports.getChangedFiles = getChangedFiles;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.getClonesReportBody = void 0;
 const getClonesReportBody = (title, statistic) => {
-    const totalLines = `Total Lines: <b>${statistic.total.lines}%</b>`;
-    const duplicatedLines = `Duplicated Lines: <b>${statistic.total.duplicatedLines}%</b>`;
+    const totalLines = `Total Lines: <b>${statistic.total.lines}</b>`;
+    const duplicatedLines = `Duplicated Lines: <b>${statistic.total.duplicatedLines}</b>`;
     const description = `${totalLines}\n\n${duplicatedLines}`;
     const body = `<h3>${title}</h3>${description}`;
     return body;
@@ -50665,6 +50714,87 @@ module.exports = {
 
 /***/ }),
 
+/***/ 12069:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const core = __nccwpck_require__(42186);
+const { barecheckApi } = __nccwpck_require__(35396);
+
+const { getBaseRefSha, getCurrentRefSha } = __nccwpck_require__(68383);
+const { getBarecheckApiKey } = __nccwpck_require__(70006);
+
+let projectAuthState = false;
+
+const authProject = async () => {
+  if (!projectAuthState) {
+    const apiKey = getBarecheckApiKey();
+
+    const authProjectRes = await barecheckApi.authProject({
+      apiKey
+    });
+
+    projectAuthState = {
+      projectId: authProjectRes.project.id,
+      accessToken: authProjectRes.accessToken
+    };
+  }
+
+  return projectAuthState;
+};
+
+const cleanAuthProject = () => {
+  projectAuthState = false;
+};
+
+const getBaseBranchClones = async () => {
+  const { ref, sha } = getBaseRefSha();
+
+  core.info(`Getting metrics from Barecheck. ref=${ref}, sha=${sha}`);
+
+  const { projectId, accessToken } = await authProject();
+
+  const clonesMetrics = await barecheckApi.clonesMetrics(accessToken, {
+    projectId,
+    ref,
+    sha,
+    take: 1
+  });
+
+  return clonesMetrics[0] ? clonesMetrics[0].totalLinesPercentage : false;
+};
+
+const sendCurrentClones = async (
+  totalLinesPercentage,
+  totalBranchesPercentage
+) => {
+  const { ref, sha } = getCurrentRefSha();
+
+  const metricsMessage = `totalLinesPercentage=${totalLinesPercentage}, totalBranchesPercentage=${totalBranchesPercentage}`;
+  core.info(
+    `Sending metrics to Barecheck. ref=${ref}, sha=${sha}, ${metricsMessage}`
+  );
+
+  const { projectId, accessToken } = await authProject();
+
+  await barecheckApi.createClonesMetric(accessToken, {
+    projectId,
+    ref,
+    sha,
+    totalLinesPercentage,
+    totalBranchesPercentage
+  });
+};
+
+module.exports = {
+  getBaseBranchClones,
+  sendCurrentClones,
+  authProject,
+  cleanAuthProject
+};
+
+
+/***/ }),
+
 /***/ 68383:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
@@ -50965,6 +51095,7 @@ const { detectClones } = __nccwpck_require__(17572);
 const { getClonesReportBody, githubApi } = __nccwpck_require__(35396);
 
 const { getPullRequestContext, getOctokit } = __nccwpck_require__(68383);
+const { sendCurrentClones } = __nccwpck_require__(12069);
 
 const { commentTitle } = __nccwpck_require__(34570);
 
@@ -50985,6 +51116,11 @@ async function main() {
       searchBody: commentTitle,
       body
     });
+
+    await sendCurrentClones(
+      statistic.total.percentage,
+      statistic.total.percentageTokens
+    );
   } catch (err) {
     core.info(err);
     core.setFailed(err.message);

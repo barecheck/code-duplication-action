@@ -232,19 +232,19 @@
     "@babel/helper-validator-identifier" "^7.14.5"
     to-fast-properties "^2.0.0"
 
-"@barecheck/clones@^0.3.0":
-  version "0.3.0"
-  resolved "https://registry.yarnpkg.com/@barecheck/clones/-/clones-0.3.0.tgz#1b73d1b67bc6fcab9e1d83f9d5a3c5a3eb087620"
-  integrity sha512-ACk10DpgdhblMI9SmxfeRJ7P9NnlwBRz47f2I73NFl8ZlorMQl9NxcfmLVQ7amlbOv7R1Fx9Zbjb69Rj7WF3hw==
+"@barecheck/clones@^0.4.0":
+  version "0.4.0"
+  resolved "https://registry.yarnpkg.com/@barecheck/clones/-/clones-0.4.0.tgz#e7de15b911a8de7a39bd2e2643254b423661a19e"
+  integrity sha512-7NoL3ofmJlfJobZddhbriYCsM1oS/e6awdIKmDax32iYgyb/Wh8OJC4Gv8HNfJEPDF+4C/EynVly371fXGJzKw==
   dependencies:
     "@jscpd/core" "^3.4.5"
     "@jscpd/finder" "^3.4.5"
     "@jscpd/tokenizer" "^3.4.5"
 
-"@barecheck/core@^0.3.0":
-  version "0.3.0"
-  resolved "https://registry.yarnpkg.com/@barecheck/core/-/core-0.3.0.tgz#654cd1f92b69b20399ba93fc02e77cc2a488b9ef"
-  integrity sha512-+WLFX8DBQ3TVzgbSxRWxoK/iE7h+MiG9wkq8xaoum85LW54I+70SNcVNdvY6Is39apwwNZ/zMJ2cQl3M37V6uQ==
+"@barecheck/core@^0.4.0":
+  version "0.4.0"
+  resolved "https://registry.yarnpkg.com/@barecheck/core/-/core-0.4.0.tgz#d0c0fb6ae4ff98b0d8cf6ac44a949fd7595df7d7"
+  integrity sha512-bqon0cnD72nXsPv/4pdDgM9a3lA2yVibKCHgVVOPYynt1NFsXE0FRtGjfOc4BMz9dk/n0YcAxv22u8EDKqteig==
   dependencies:
     "@octokit/core" "^3.6.0"
     "@types/node" "^16.11.0"

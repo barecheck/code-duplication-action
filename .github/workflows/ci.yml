@@ -39,3 +39,17 @@ jobs:
 
       - name: Install dependencies
         run: yarn test
+
+      - name: Run test coverage
+        run: yarn coverage
+
+      - name: Generate Code Coverage report
+        id: code-coverage
+        uses: barecheck/code-coverage-action@v1
+        with:
+          barecheck-github-app-token: ${{ secrets.BARECHECK_GITHUB_APP_TOKEN }}
+          barecheck-api-key: ${{ secrets.BARECHECK_API_KEY }}
+          lcov-file: "./coverage/lcov.info"
+          minimum-ratio: 0
+          send-summary-comment: true
+          show-annotations: "warning"
